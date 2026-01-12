@@ -1,0 +1,54 @@
+# opamp-server.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opamp-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opamp-server
+  namespace: opamp-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opamp-server
+  template:
+    metadata:
+      labels:
+        app: opamp-server
+    spec:
+      containers:
+        - name: server
+          image: opamp-poc-server:latest   # or REGISTRY/PROJECT/opamp-poc-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: ws
+              containerPort: 4320
+            - name: ui
+              containerPort: 4321
+          readinessProbe:
+            httpGet:
+              path: /
+              port: ui
+          livenessProbe:
+            httpGet:
+              path: /
+              port: ui
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opamp-server
+  namespace: opamp-system
+spec:
+  selector:
+    app: opamp-server
+  ports:
+    - name: ws
+      port: 4320
+      targetPort: 4320
+    - name: ui
+      port: 4321
+      targetPort: 4321
