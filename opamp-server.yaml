@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
         - name: server
-          image: opamp-poc-server:latest   # or REGISTRY/PROJECT/opamp-poc-server:latest
-          imagePullPolicy: IfNotPresent
+          image: opamp-server-ui:latest
+          imagePullPolicy: Never
           ports:
             - name: ws
               containerPort: 4320

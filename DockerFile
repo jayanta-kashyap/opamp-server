@@ -1,13 +1,14 @@
-# Build the opamp-go poc server
+# Build custom OpAMP server with enhanced UI
 FROM golang:1.23 AS builder
 WORKDIR /src
-RUN git clone https://github.com/open-telemetry/opamp-go.git
-WORKDIR /src/opamp-go/internal/examples/server
-RUN CGO_ENABLED=0 go build -o /out/opamp-poc-server .
+COPY . .
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/opamp-server ./cmd/server
 
 # Minimal runtime image
 FROM gcr.io/distroless/base-debian11
-COPY --from=builder /out/opamp-poc-server /opamp-server
+COPY --from=builder /out/opamp-server /opamp-server
+COPY --from=builder /src/internal/ui/dashboard.html /internal/ui/dashboard.html
 EXPOSE 4320 4321
-# 4320: OpAMP WS/HTTP endpoint, 4321: poc server UI
+# 4320: OpAMP WebSocket endpoint, 4321: HTTP UI + API
 ENTRYPOINT ["/opamp-server"]

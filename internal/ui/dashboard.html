@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpAMP Device Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .device-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .device-item {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        .device-item:hover {
+            border-color: #667eea;
+            background: #f0f0ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .device-item.selected {
+            border-color: #667eea;
+            background: #e8ebff;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        .device-id {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .device-status {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .status-online {
+            color: #28a745;
+        }
+        .status-offline {
+            color: #dc3545;
+        }
+        .config-section {
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            transition: border-color 0.3s ease;
+        }
+        select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 300px;
+            resize: vertical;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .message {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        .info-box {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #2196F3;
+            margin-bottom: 20px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎛️ OpAMP Device Management Console</h1>
+        
+        <div class="card">
+            <div class="section-title">Connected OTel Agents</div>
+            <div id="message" class="message"></div>
+            <div id="deviceList" class="device-list">
+                <div class="info-box">Loading devices...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">Configuration Management</div>
+            <div class="config-section">
+                <div class="form-group">
+                    <label for="deviceSelect">Select Device:</label>
+                    <select id="deviceSelect">
+                        <option value="">-- Select a device --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="currentConfig">Current Configuration:</label>
+                    <textarea id="currentConfig" readonly placeholder="Select a device to view its configuration..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="desiredConfig">New Configuration (YAML):</label>
+                    <textarea id="desiredConfig" placeholder="Enter the desired OTel Collector configuration in YAML format..."></textarea>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="pushConfig()">Push Configuration</button>
+                    <button class="btn-secondary" onclick="loadTemplate()">Load Template</button>
+                    <button class="btn-secondary" onclick="clearConfig()">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let devices = [];
+        let selectedDevice = null;
+
+        async function fetchDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                if (!response.ok) throw new Error('Failed to fetch devices');
+                const data = await response.json();
+                // Filter out supervisors - users only see actual devices
+                devices = (data.devices || []).filter(d => !d.is_supervisor);
+                renderDevices();
+            } catch (error) {
+                showMessage('Error loading devices: ' + error.message, 'error');
+                document.getElementById('deviceList').innerHTML = '<div class="info-box">Error loading devices. Please refresh the page.</div>';
+            }
+        }
+
+        function renderDevices() {
+            const deviceList = document.getElementById('deviceList');
+            const deviceSelect = document.getElementById('deviceSelect');
+            
+            if (devices.length === 0) {
+                deviceList.innerHTML = '<div class="info-box">No devices connected. Waiting for agents to connect...</div>';
+                deviceSelect.innerHTML = '<option value="">-- No devices available --</option>';
+                return;
+            }
+
+            deviceList.innerHTML = devices.map(device => `
+                <div class="device-item ${selectedDevice === device.id ? 'selected' : ''}" onclick="selectDevice('${device.id}')">
+                    <div class="device-id">${device.name || device.id}</div>
+                    <div class="device-status" style="font-size: 0.85em; color: #888; margin-top: 3px;">ID: ${device.id}</div>
+                    <div class="device-status ${device.connected ? 'status-online' : 'status-offline'}">
+                        ${device.connected ? '● Connected' : '○ Disconnected'}
+                    </div>
+                </div>
+            `).join('');
+
+            deviceSelect.innerHTML = '<option value="">-- Select a device --</option>' +
+                devices.map(device => `<option value="${device.id}">${device.name || device.id} (${device.id})</option>`).join('');
+        }
+
+        async function selectDevice(deviceId) {
+            selectedDevice = deviceId;
+            document.getElementById('deviceSelect').value = deviceId;
+            renderDevices();
+            
+            // Fetch current config from devices endpoint
+            try {
+                const response = await fetch(`/api/devices/${deviceId}/config`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('currentConfig').value = data.config || 'No configuration available';
+                } else {
+                    document.getElementById('currentConfig').value = 'Unable to fetch current configuration';
+                }
+            } catch (error) {
+                console.error('Error fetching config:', error);
+                document.getElementById('currentConfig').value = 'Error loading configuration';
+            }
+        }
+
+        document.getElementById('deviceSelect').addEventListener('change', function(e) {
+            if (e.target.value) {
+                selectDevice(e.target.value);
+            }
+        });
+
+        async function pushConfig() {
+            const deviceId = document.getElementById('deviceSelect').value;
+            const config = document.getElementById('desiredConfig').value;
+
+            if (!deviceId) {
+                showMessage('Please select a device first', 'error');
+                return;
+            }
+
+            if (!config.trim()) {
+                showMessage('Please enter a configuration', 'error');
+                return;
+            }
+
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Pushing...';
+            button.disabled = true;
+
+            try {
+                const response = await fetch('/api/devices/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        agentId: deviceId,
+                        config: config
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`✅ Configuration successfully pushed to ${deviceId}!`, 'success');
+                    document.getElementById('desiredConfig').value = '';
+                    // Refresh current config
+                    selectDevice(deviceId);
+                } else {
+                    showMessage(`❌ Failed to push configuration: ${result.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`❌ Error pushing configuration: ${error.message}`, 'error');
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function loadTemplate() {
+            const template = `receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+
+exporters:
+  logging:
+    loglevel: debug
+  otlp:
+    endpoint: collector-service:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, otlp]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, otlp]`;
+            
+            document.getElementById('desiredConfig').value = template;
+        }
+
+        function clearConfig() {
+            document.getElementById('desiredConfig').value = '';
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Initial fetch and periodic refresh
+        fetchDevices();
+        setInterval(fetchDevices, 5000);
+    </script>
+</body>
+</html>
