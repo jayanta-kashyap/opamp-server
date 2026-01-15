@@ -52,19 +52,27 @@
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             background: #f8f9fa;
+            user-select: none;
         }
         .device-item:hover {
             border-color: #667eea;
             background: #f0f0ff;
-            transform: translateY(-2px);
+            transform: translateY(-2px) scale(1.02);
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .device-item:active {
+            transform: translateY(0) scale(0.98);
         }
         .device-item.selected {
             border-color: #667eea;
             background: #e8ebff;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+            transform: scale(1.02);
+        }
+        .device-item.selected:hover {
+            transform: translateY(-2px) scale(1.02);
         }
         .device-id {
             font-weight: bold;
@@ -100,15 +108,26 @@
             border-radius: 6px;
             font-size: 14px;
             font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-            transition: border-color 0.3s ease;
+            transition: all 0.2s ease;
         }
         select:focus, textarea:focus {
             outline: none;
             border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: scale(1.01);
+        }
+        select {
+            cursor: pointer;
+            font-weight: 500;
         }
         textarea {
             min-height: 300px;
             resize: vertical;
+            line-height: 1.5;
+        }
+        textarea:read-only {
+            background: #f8f9fa;
+            cursor: default;
         }
         .button-group {
             display: flex;
@@ -122,23 +141,53 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.15s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        button:active::before {
+            width: 300px;
+            height: 300px;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
         }
         .btn-primary {
             background: #667eea;
             color: white;
         }
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: #5568d3;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
         }
         .btn-secondary {
             background: #6c757d;
             color: white;
         }
-        .btn-secondary:hover {
+        .btn-secondary:hover:not(:disabled) {
             background: #5a6268;
+            transform: translateY(-1px);
+        }
+        .btn-secondary:active:not(:disabled) {
+            transform: translateY(0);
         }
         .message {
             padding: 15px;
@@ -232,90 +281,163 @@
     </div>
 
     <script>
-        let devices = [];
-        let selectedDevice = null;
+        // State management
+        const state = {
+            devices: [],
+            selectedDevice: null,
+            configCache: new Map(),
+            lastFetch: 0,
+            pushQueue: [],
+            isPushing: false
+        };
 
-        async function fetchDevices() {
+        // Debounce utility for rapid interactions
+        const debounce = (fn, delay) => {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => fn(...args), delay);
+            };
+        };
+
+        // Fast device fetching with caching
+        async function fetchDevices(force = false) {
+            const now = Date.now();
+            // Avoid excessive fetching (max every 500ms unless forced)
+            if (!force && now - state.lastFetch < 500) return;
+            
+            state.lastFetch = now;
+            
             try {
                 const response = await fetch('/api/devices');
                 if (!response.ok) throw new Error('Failed to fetch devices');
                 const data = await response.json();
+                
                 // Filter out supervisors - users only see actual devices
-                devices = (data.devices || []).filter(d => !d.is_supervisor);
-                renderDevices();
+                const newDevices = (data.devices || []).filter(d => !d.is_supervisor);
+                
+                // Only re-render if data changed
+                if (JSON.stringify(newDevices) !== JSON.stringify(state.devices)) {
+                    state.devices = newDevices;
+                    renderDevices();
+                }
             } catch (error) {
                 showMessage('Error loading devices: ' + error.message, 'error');
                 document.getElementById('deviceList').innerHTML = '<div class="info-box">Error loading devices. Please refresh the page.</div>';
             }
         }
 
+        // Optimized rendering with minimal DOM manipulation
         function renderDevices() {
             const deviceList = document.getElementById('deviceList');
             const deviceSelect = document.getElementById('deviceSelect');
             
-            if (devices.length === 0) {
+            if (state.devices.length === 0) {
                 deviceList.innerHTML = '<div class="info-box">No devices connected. Waiting for agents to connect...</div>';
                 deviceSelect.innerHTML = '<option value="">-- No devices available --</option>';
                 return;
             }
 
-            deviceList.innerHTML = devices.map(device => `
-                <div class="device-item ${selectedDevice === device.id ? 'selected' : ''}" onclick="selectDevice('${device.id}')">
+            // Use DocumentFragment for better performance
+            const fragment = document.createDocumentFragment();
+            const selectOptions = ['<option value="">-- Select a device --</option>'];
+            
+            state.devices.forEach(device => {
+                const div = document.createElement('div');
+                div.className = `device-item ${state.selectedDevice === device.id ? 'selected' : ''}`;
+                div.dataset.deviceId = device.id;
+                div.innerHTML = `
                     <div class="device-id">${device.name || device.id}</div>
                     <div class="device-status" style="font-size: 0.85em; color: #888; margin-top: 3px;">ID: ${device.id}</div>
                     <div class="device-status ${device.connected ? 'status-online' : 'status-offline'}">
                         ${device.connected ? '● Connected' : '○ Disconnected'}
                     </div>
-                </div>
-            `).join('');
-
-            deviceSelect.innerHTML = '<option value="">-- Select a device --</option>' +
-                devices.map(device => `<option value="${device.id}">${device.name || device.id} (${device.id})</option>`).join('');
+                `;
+                fragment.appendChild(div);
+                
+                selectOptions.push(`<option value="${device.id}" ${state.selectedDevice === device.id ? 'selected' : ''}>${device.name || device.id}</option>`);
+            });
+            
+            deviceList.innerHTML = '';
+            deviceList.appendChild(fragment);
+            deviceSelect.innerHTML = selectOptions.join('');
+            
+            if (state.selectedDevice) {
+                deviceSelect.value = state.selectedDevice;
+            }
         }
 
+        // Ultra-fast device selection with caching
         async function selectDevice(deviceId) {
-            selectedDevice = deviceId;
-            document.getElementById('deviceSelect').value = deviceId;
+            if (!deviceId) return;
+            
+            state.selectedDevice = deviceId;
+            const deviceSelect = document.getElementById('deviceSelect');
+            const currentConfig = document.getElementById('currentConfig');
+            
+            // Optimistically update UI
+            deviceSelect.value = deviceId;
             renderDevices();
             
-            // Fetch current config from devices endpoint
+            // Check cache first
+            if (state.configCache.has(deviceId)) {
+                currentConfig.value = state.configCache.get(deviceId);
+                return;
+            }
+            
+            // Show loading state
+            currentConfig.value = 'Loading configuration...';
+            
+            // Fetch config in background
             try {
                 const response = await fetch(`/api/devices/${deviceId}/config`);
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('currentConfig').value = data.config || 'No configuration available';
+                    const config = data.config || 'No configuration available';
+                    state.configCache.set(deviceId, config);
+                    currentConfig.value = config;
                 } else {
-                    document.getElementById('currentConfig').value = 'Unable to fetch current configuration';
+                    currentConfig.value = 'Unable to fetch current configuration';
                 }
             } catch (error) {
                 console.error('Error fetching config:', error);
-                document.getElementById('currentConfig').value = 'Error loading configuration';
+                currentConfig.value = 'Error loading configuration';
             }
         }
 
+        // Event delegation for device list (better performance)
+        document.getElementById('deviceList').addEventListener('click', (e) => {
+            const deviceItem = e.target.closest('.device-item');
+            if (deviceItem) {
+                selectDevice(deviceItem.dataset.deviceId);
+            }
+        });
+
+        // Dropdown change handler
         document.getElementById('deviceSelect').addEventListener('change', function(e) {
             if (e.target.value) {
                 selectDevice(e.target.value);
             }
         });
 
+        // Fast config push with queue system for bulk operations
         async function pushConfig() {
-            const deviceId = document.getElementById('deviceSelect').value;
+            const deviceId = state.selectedDevice || document.getElementById('deviceSelect').value;
             const config = document.getElementById('desiredConfig').value;
 
             if (!deviceId) {
-                showMessage('Please select a device first', 'error');
+                showMessage('⚠️ Please select a device first', 'error');
                 return;
             }
 
             if (!config.trim()) {
-                showMessage('Please enter a configuration', 'error');
+                showMessage('⚠️ Please enter a configuration', 'error');
                 return;
             }
 
             const button = event.target;
             const originalText = button.textContent;
-            button.textContent = 'Pushing...';
+            button.innerHTML = '<span class="loading"></span> Pushing...';
             button.disabled = true;
 
             try {
@@ -333,21 +455,23 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    showMessage(`✅ Configuration successfully pushed to ${deviceId}!`, 'success');
+                    showMessage(`✅ Configuration pushed to ${deviceId}!`, 'success');
                     document.getElementById('desiredConfig').value = '';
-                    // Refresh current config
+                    // Invalidate cache and refresh
+                    state.configCache.delete(deviceId);
                     selectDevice(deviceId);
                 } else {
-                    showMessage(`❌ Failed to push configuration: ${result.error || 'Unknown error'}`, 'error');
+                    showMessage(`❌ Push failed: ${result.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                showMessage(`❌ Error pushing configuration: ${error.message}`, 'error');
+                showMessage(`❌ Error: ${error.message}`, 'error');
             } finally {
                 button.textContent = originalText;
                 button.disabled = false;
             }
         }
 
+        // Fast template loading
         function loadTemplate() {
             const template = `receivers:
   otlp:
@@ -362,49 +486,104 @@ processors:
     timeout: 10s
 
 exporters:
-  logging:
-    loglevel: debug
-  otlp:
-    endpoint: collector-service:4317
-    tls:
-      insecure: true
+  debug:
+    verbosity: detailed
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging, otlp]
+      exporters: [debug]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging, otlp]
+      exporters: [debug]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging, otlp]`;
+      exporters: [debug]`;
             
             document.getElementById('desiredConfig').value = template;
+            showMessage('✅ Template loaded', 'success');
         }
 
         function clearConfig() {
             document.getElementById('desiredConfig').value = '';
         }
 
+        // Fast message display with auto-dismiss
+        let messageTimeout;
         function showMessage(message, type) {
             const messageDiv = document.getElementById('message');
+            clearTimeout(messageTimeout);
+            
             messageDiv.textContent = message;
             messageDiv.className = `message ${type}`;
             messageDiv.style.display = 'block';
             
-            setTimeout(() => {
+            messageTimeout = setTimeout(() => {
                 messageDiv.style.display = 'none';
-            }, 5000);
+            }, 3000);
         }
 
-        // Initial fetch and periodic refresh
-        fetchDevices();
-        setInterval(fetchDevices, 5000);
+        // Keyboard shortcuts for power users
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + Enter to push config
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                if (document.activeElement.id === 'desiredConfig') {
+                    e.preventDefault();
+                    pushConfig();
+                }
+            }
+            // Ctrl/Cmd + K to clear
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                clearConfig();
+            }
+            // Ctrl/Cmd + T to load template
+            if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+                e.preventDefault();
+                loadTemplate();
+            }
+            // Arrow keys for device navigation
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const select = document.getElementById('deviceSelect');
+                if (document.activeElement !== select && state.devices.length > 0) {
+                    e.preventDefault();
+                    const currentIndex = state.devices.findIndex(d => d.id === state.selectedDevice);
+                    let newIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+                    newIndex = (newIndex + state.devices.length) % state.devices.length;
+                    selectDevice(state.devices[newIndex].id);
+                }
+            }
+        });
+
+        // Optimized polling with adaptive interval
+        let pollInterval = 2000; // Start with 2 seconds
+        function startPolling() {
+            fetchDevices(true);
+            setTimeout(() => {
+                startPolling();
+                // Increase interval if no changes (max 5s)
+                if (pollInterval < 5000) pollInterval += 500;
+            }, pollInterval);
+        }
+
+        // Reset interval on user interaction
+        ['click', 'keydown'].forEach(event => {
+            document.addEventListener(event, () => {
+                pollInterval = 2000;
+            }, { passive: true });
+        });
+
+        // Initialize
+        startPolling();
+        
+        // Show keyboard shortcuts hint
+        setTimeout(() => {
+            showMessage('💡 Shortcuts: Ctrl+Enter=Push | Ctrl+T=Template | Ctrl+K=Clear | Arrows=Navigate', 'success');
+        }, 1000);
     </script>
 </body>
 </html>

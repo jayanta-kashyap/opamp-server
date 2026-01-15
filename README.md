@@ -3,6 +3,17 @@
 ## Overview
 The OpAMP Server is the central management and monitoring hub for the entire POC. It provides a web-based UI for managing OpenTelemetry collectors deployed on edge devices and acts as the OpAMP protocol server that supervisors connect to.
 
+## Quick Access
+
+**Web UI:** http://localhost:4321
+
+After deploying the pods, run once:
+```bash
+./start-ui-access.sh
+```
+
+This starts a background process that keeps the UI accessible. No need to keep terminal open!
+
 ## Role in the POC Architecture
 
 ```
@@ -146,8 +157,36 @@ Pushes configuration to a specific device
 - **Protocol:** WebSocket (OpAMP), HTTP/REST (UI API)
 
 ## Deployment
-- **Container Image:** `opamp-server:latest`
-- **Kubernetes:** Deployed in `opamp-system` namespace
+
+### Deploy the Server
+```bash
+# Build Docker image (inside minikube Docker context)
+eval $(minikube docker-env)
+docker build -t opamp-server-ui:latest -f DockerFile .
+
+# Deploy to Kubernetes
+kubectl apply -f opamp-server.yaml
+
+# Verify deployment
+kubectl get pods -n opamp-system
+```
+
+### Access the UI (One-Time Setup)
+```bash
+# From the opamp-server directory, run:
+./start-ui-access.sh
+```
+
+This starts the UI in background. Open **http://localhost:4321** in your browser!
+
+To stop later: `./stop-ui-access.sh`
+
+**Note:** After Minikube restarts, just run `./start-ui-access.sh` again.
+
+### Kubernetes Resources
+- **Namespace:** `opamp-system`
+- **Deployment:** `opamp-server`
+- **Service:** `opamp-server` (ClusterIP, NodePort)
 - **Ports:**
   - 4320: OpAMP WebSocket endpoint
   - 4321: Web UI and API

@@ -43,12 +43,15 @@ metadata:
   name: opamp-server
   namespace: opamp-system
 spec:
+  type: NodePort
   selector:
     app: opamp-server
   ports:
     - name: ws
       port: 4320
       targetPort: 4320
+      nodePort: 30320
     - name: ui
       port: 4321
       targetPort: 4321
+      nodePort: 30321

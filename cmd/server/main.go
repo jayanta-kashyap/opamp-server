@@ -102,6 +102,16 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 		agent.conn = conn
 	}
 
+	// Handle EffectiveConfig - store the current running config from devices
+	if msg.EffectiveConfig != nil && msg.EffectiveConfig.ConfigMap != nil {
+		for deviceID, configFile := range msg.EffectiveConfig.ConfigMap.ConfigMap {
+			if device, exists := s.devices[deviceID]; exists {
+				device.Config = string(configFile.Body)
+				log.Printf("Updated effective config for device %s (%d bytes)", deviceID, len(configFile.Body))
+			}
+		}
+	}
+
 	// If this is a supervisor, extract device list from non-identifying attributes
 	if agent.IsSupervisor && msg.AgentDescription != nil && msg.AgentDescription.NonIdentifyingAttributes != nil {
 		deviceList := []string{}
@@ -122,9 +132,10 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 						Name:         deviceID,
 						Connected:    true,
 						SupervisorID: agentID,
+						Config:       getDefaultConfig(deviceID), // Load default config
 					}
 					s.devices[deviceID] = device
-					log.Printf("Registered new device: %s via supervisor %s", deviceID, agentID)
+					log.Printf("Registered new device: %s via supervisor %s with default config", deviceID, agentID)
 				} else {
 					device.Connected = true
 					device.SupervisorID = agentID
@@ -309,6 +320,87 @@ func (s *OpAMPServer) PushConfig(deviceID, config string) error {
 
 	log.Printf("Successfully pushed config to device %s via supervisor %s", deviceID, supervisorID)
 	return nil
+}
+
+func getDefaultConfig(deviceID string) string {
+	// Return the default configuration for each device based on its ID
+	// These match the ConfigMaps deployed in Kubernetes
+	configs := map[string]string{
+		"device-1": `receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info`,
+		"device-2": `receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info`,
+		"device-3": `receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info`,
+	}
+
+	if config, exists := configs[deviceID]; exists {
+		return config
+	}
+	return "# No default configuration available"
 }
 
 func main() {
