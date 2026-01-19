@@ -10,7 +10,7 @@ Complete implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetr
   - [Architecture Overview](#architecture-overview)
   - [Core Capabilities](#core-capabilities)
   - [OpAMP Protocol Functions Used](#opamp-protocol-functions-used)
-  - [Why Separate Pods?](#why-separate-pods)
+  - [Pod Separation Design in the Edge Device](#pod-separation-design-in-the-edge-device)
 - [Prerequisites](#-prerequisites)
 - [Clone Repositories](#-clone-repositories)
 - [Quick Setup (One Command)](#-quick-setup-one-command)
@@ -106,7 +106,7 @@ This POC implements the following OpAMP specification functions:
 
 
 
-### Why Separate Pods?
+### Pod Separation Design in the Edge Device
 
 Each device has **2 pods** sharing 1 PVC:
 
