@@ -134,9 +134,9 @@ This POC requires 3 repositories to be cloned as siblings in the same directory:
 mkdir opamp-poc && cd opamp-poc
 
 # Clone all three repos
-git clone <opamp-server-repo-url> opamp-server
-git clone <opamp-supervisor-repo-url> opamp-supervisor
-git clone <opamp-device-agent-repo-url> opamp-device-agent
+git clone https://github.com/jayanta-kashyap/opamp-server.git opamp-server
+git clone https://github.com/jayanta-kashyap/opamp-supervisor.git opamp-supervisor
+git clone https://github.com/jayanta-kashyap/opamp-device-agent.git opamp-device-agent
 ```
 
 Your directory structure should look like:
