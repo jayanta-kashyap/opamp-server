@@ -4,6 +4,29 @@ Complete implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetr
 
 ---
 
+## 📑 Table of Contents
+
+- [What This POC Demonstrates](#-what-this-poc-demonstrates)
+  - [Architecture Overview](#architecture-overview)
+  - [Core Capabilities](#core-capabilities)
+  - [OpAMP Protocol Functions Used](#opamp-protocol-functions-used)
+  - [Why Separate Pods?](#why-separate-pods)
+- [Prerequisites](#-prerequisites)
+- [Clone Repositories](#-clone-repositories)
+- [Quick Setup (One Command)](#-quick-setup-one-command)
+- [Manual Setup (Step by Step)](#-manual-setup-step-by-step)
+- [Using the System](#-using-the-system)
+- [Common Operations](#-common-operations)
+- [Cleanup](#️-cleanup)
+- [System Behavior](#-system-behavior)
+- [Troubleshooting](#-troubleshooting)
+- [Repository Structure](#-repository-structure)
+- [Key Files](#-key-files)
+- [Timing](#️-timing)
+- [Learn More](#-learn-more)
+
+---
+
 ## 🎯 What This POC Demonstrates
 
 ### Architecture Overview
