@@ -1,6 +1,6 @@
 # OpAMP POC - Remote Edge Device Management
 
-Complete implementation of OpenTelemetry's OpAMP protocol for remotely managing Fluent Bit log collectors on edge devices.
+Complete implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs/specs/opamp/) for remotely managing Fluent Bit log collectors on edge devices.
 
 ---
 
@@ -8,18 +8,29 @@ Complete implementation of OpenTelemetry's OpAMP protocol for remotely managing 
 
 ### Core Capabilities
 
-| Capability | Description | Status |
-|------------|-------------|--------|
-| **Remote Management** | Control edge devices from cloud UI | ✅ Working |
-| **OpAMP Protocol** | Standard OpenTelemetry management protocol | ✅ Implemented |
-| **One-Way Toggle** | Enable data emission (OFF→ON only) | ✅ Working |
-| **Hot Reload** | Config updates without pod restarts | ✅ Working |
-| **Auto-Registration** | Devices appear in UI when connected | ✅ Working |
-| **Heartbeat Tracking** | 2-minute timeout for stale detection | ✅ Working |
-| **Runtime Monitoring** | Devices report actual Fluent Bit state (30s interval) | ✅ Working |
-| **Separate Pods** | Device-Agent + Fluent Bit isolated for stability | ✅ Working |
-| **Shared Storage** | PVC (ReadWriteMany) for config sharing | ✅ Working |
-| **Web Dashboard** | Real-time device status and control | ✅ Working |
+✅ Remote device management via OpAMP  |  ✅ Hot reload (zero downtime)  |  ✅ Auto-registration  
+✅ Heartbeat tracking (2min timeout)  |  ✅ Runtime monitoring (30s)  |  ✅ Web dashboard  
+✅ Separate pods (agent + fluentbit)  |  ✅ Shared PVC storage  |  ✅ One-way toggle (OFF→ON)
+
+---
+
+### OpAMP Protocol Functions Used
+
+This POC implements the following OpAMP specification functions:
+
+| Function | Description |
+|----------|-------------|
+| [`AgentToServer`](https://opentelemetry.io/docs/specs/opamp/#agenttoserver-message) | Message sent from agent to server containing status, health, and capabilities |
+| [`ServerToAgent`](https://opentelemetry.io/docs/specs/opamp/#servertoagent-message) | Response from server with remote config, commands, and connection settings |
+| [`AgentDescription`](https://opentelemetry.io/docs/specs/opamp/#agentdescription-message) | Agent metadata including identifying and non-identifying attributes |
+| [`EffectiveConfig`](https://opentelemetry.io/docs/specs/opamp/#effectiveconfig-message) | Current merged configuration the agent is using (remote + local) |
+| [`RemoteConfigStatus`](https://opentelemetry.io/docs/specs/opamp/#remoteconfigstatus-message) | Status of remote config application (APPLIED, APPLYING, FAILED) |
+| [`ComponentHealth`](https://opentelemetry.io/docs/specs/opamp/#componenthealth-message) | Health status of agent and sub-components with timestamps |
+| [`AgentRemoteConfig`](https://opentelemetry.io/docs/specs/opamp/#agentremoteconfig-message) | Remote configuration offered by server with config hash |
+| [`AgentCapabilities`](https://opentelemetry.io/docs/specs/opamp/#agenttoservercapabilities) | Bitmask of agent capabilities (AcceptsRemoteConfig, ReportsStatus, etc.) |
+| [Status Reporting](https://opentelemetry.io/docs/specs/opamp/#status-reporting) | Continuous status updates from agent to server on state changes |
+| [WebSocket Transport](https://opentelemetry.io/docs/specs/opamp/#websocket-transport) | Full-duplex async communication using WebSocket with Protobuf encoding |
+| [Heartbeat](https://opentelemetry.io/docs/specs/opamp/#websocket-message-exchange) | Periodic AgentToServer messages (30s default) to maintain connection |
 
 ### Architecture Overview
 
