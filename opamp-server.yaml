@@ -1,14 +1,9 @@
 # opamp-server.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: opamp-system
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: opamp-server
-  namespace: opamp-system
+  namespace: opamp-control
 spec:
   replicas: 1
   selector:
@@ -21,7 +16,7 @@ spec:
     spec:
       containers:
         - name: server
-          image: opamp-server-ui:latest
+          image: opamp-server:v1
           imagePullPolicy: Never
           ports:
             - name: ws
@@ -41,7 +36,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: opamp-server
-  namespace: opamp-system
+  namespace: opamp-control
 spec:
   type: NodePort
   selector:

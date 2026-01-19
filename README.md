@@ -1,211 +1,554 @@
-# OpAMP Server
+# OpAMP POC - Remote Edge Device Management
 
-## Overview
-The OpAMP Server is the central management and monitoring hub for the entire POC. It provides a web-based UI for managing OpenTelemetry collectors deployed on edge devices and acts as the OpAMP protocol server that supervisors connect to.
+Complete implementation of OpenTelemetry's OpAMP protocol for remotely managing Fluent Bit log collectors on edge devices.
 
-## Quick Access
+---
 
-**Web UI:** http://localhost:4321
+## 🎯 What This POC Demonstrates
 
-After deploying the pods, run once:
+### Core Capabilities
+
+| Capability | Description | Status |
+|------------|-------------|--------|
+| **Remote Management** | Control edge devices from cloud UI | ✅ Working |
+| **OpAMP Protocol** | Standard OpenTelemetry management protocol | ✅ Implemented |
+| **One-Way Toggle** | Enable data emission (OFF→ON only) | ✅ Working |
+| **Hot Reload** | Config updates without pod restarts | ✅ Working |
+| **Auto-Registration** | Devices appear in UI when connected | ✅ Working |
+| **Heartbeat Tracking** | 2-minute timeout for stale detection | ✅ Working |
+| **Runtime Monitoring** | Devices report actual Fluent Bit state (30s interval) | ✅ Working |
+| **Separate Pods** | Device-Agent + Fluent Bit isolated for stability | ✅ Working |
+| **Shared Storage** | PVC (ReadWriteMany) for config sharing | ✅ Working |
+| **Web Dashboard** | Real-time device status and control | ✅ Working |
+
+### Architecture Overview
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│              Cloud (Minikube: opamp-control namespace)         │
+│                                                                │
+│  ┌───────────────────┐         ┌────────────────────────┐     │
+│  │   OpAMP Server    │◄─OpAMP──┤  OpAMP Supervisor      │     │
+│  │   Web UI + API    │         │  gRPC Server :50051    │     │
+│  │   Port: 4321      │         │  Device Registry       │     │
+│  └───────────────────┘         └───────────┬────────────┘     │
+│           │                                │                   │
+│           │ HTTP                           │ gRPC              │
+│           ▼                                │ (per device)      │
+│     User Browser                           │                   │
+│   localhost:8080                           │                   │
+└────────────────────────────────────────────┼───────────────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────┐
+                    │                        │                    │
+┌───────────────────┼────────────────────────┼────────────────────┼───┐
+│                   │    Edge (opamp-edge)   │                    │   │
+│                   ▼                        ▼                    ▼   │
+│          ┌─────────────┐          ┌─────────────┐      ┌─────────┐ │
+│          │  Device-1   │          │  Device-2   │ ...  │Device-N │ │
+│          │   (gRPC)    │          │   (gRPC)    │      │ (gRPC)  │ │
+│          └─────────────┘          └─────────────┘      └─────────┘ │
+└────────────────────────────────────────────────────────────────────┘
+
+Each Device:
+┌─────────────────────────────────────────────────────┐
+│                    Device-N                         │
+│                                                     │
+│  ┌─────────────────┐      ┌─────────────────────┐  │
+│  │  Device-Agent   │      │     Fluent Bit      │  │
+│  │     (Pod 1)     │      │      (Pod 2)        │  │
+│  │                 │      │                     │  │
+│  │ • gRPC client   │      │ • Log collector     │  │
+│  │ • Config writer │      │ • Hot reload :2020  │  │
+│  │ • Reload caller │      │ • Reads from PVC    │  │
+│  └────────┬────────┘      └──────────┬──────────┘  │
+│           │                          │             │
+│           │    Shared PVC (R/W)      │             │
+│           └──────────┬───────────────┘             │
+│                      │                             │
+│              /shared-config/fluent-bit.conf        │
+└─────────────────────────────────────────────────────┘
+```
+
+### Why Separate Pods?
+
+Each device has **2 pods** sharing 1 PVC:
+
+1. **Device-Agent Pod**
+   - Connects to Supervisor via gRPC
+   - Receives config updates
+   - Writes to shared PVC
+   - Calls Fluent Bit reload API
+   - Reports runtime state
+
+2. **Fluent Bit Pod**
+   - Reads config from shared PVC
+   - Hot reloads automatically
+   - Emits logs when enabled
+   - Exposes API on port 2020
+
+**Benefits:**
+- **Zero Downtime**: Config updates without restart
+- **Isolation**: One pod crash doesn't affect the other
+- **Shared Config**: Both pods see same file via ReadWriteMany PVC
+
+---
+
+## 📋 Prerequisites
+
+### macOS Requirements
+
 ```bash
-./start-ui-access.sh
+# Install via Homebrew
+brew install --cask docker     # Docker Desktop
+brew install minikube          # Local Kubernetes
+brew install kubectl           # Kubernetes CLI
+brew install jq                # JSON processor
+brew install go                # Go 1.21+
 ```
 
-This starts a background process that keeps the UI accessible. No need to keep terminal open!
+### System Requirements
+- **CPU**: 4+ cores
+- **RAM**: 6 GB minimum (8 GB recommended)
+- **Disk**: 20 GB free space
 
-## Role in the POC Architecture
+---
 
+## 📦 Clone Repositories
+
+This POC requires 3 repositories to be cloned as siblings in the same directory:
+
+```bash
+# Create workspace directory
+mkdir opamp-poc && cd opamp-poc
+
+# Clone all three repos
+git clone <opamp-server-repo-url> opamp-server
+git clone <opamp-supervisor-repo-url> opamp-supervisor
+git clone <opamp-device-agent-repo-url> opamp-device-agent
 ```
-┌─────────────────────────────────────────┐
-│      OpAMP Server (This Component)      │
-│  ┌─────────────┐      ┌──────────────┐ │
-│  │   Web UI    │      │ OpAMP Server │ │
-│  │  (Port 4321)│      │  (Port 4320) │ │
-│  └─────────────┘      └──────────────┘ │
-└─────────────────────────────────────────┘
-              ↕ OpAMP Protocol (WebSocket)
-┌─────────────────────────────────────────┐
-│           Supervisor (gRPC)             │
-└─────────────────────────────────────────┘
-              ↕ Bidirectional gRPC
-┌─────────────────────────────────────────┐
-│     Device Agents + OTel Collectors     │
-└─────────────────────────────────────────┘
+
+Your directory structure should look like:
+```
+opamp-poc/
+├── opamp-server/        # This repo (main)
+├── opamp-supervisor/    # Companion repo
+└── opamp-device-agent/  # Companion repo
 ```
 
-## Components
+---
 
-### 1. Web UI (Port 4321)
-**Purpose:** Provides a user-friendly interface for operators to manage OTel collectors on edge devices.
+## 🚀 Quick Setup (One Command)
 
-**Functionality:**
-- **Device Discovery:** Automatically displays all connected OTel agents with their IDs and connection status
-- **Configuration Management:** 
-  - View current configuration of any device
-  - Send new YAML configurations to devices
-  - Load pre-built configuration templates
-- **Real-time Status:** Shows online/offline status of each device
-- **Success/Error Feedback:** Displays clear messages when configurations are pushed successfully or fail
+```bash
+cd opamp-server
+./scripts/setup.sh
+```
 
-**How it works:**
-- Fetches device list from `/api/devices` endpoint every 5 seconds
-- Allows clicking on a device to view its current config
-- Provides input box to write/paste desired configuration
-- Sends configuration to `/api/agents/config` endpoint
-- Displays success ✅ or error ❌ messages
+This script automatically:
+1. ✅ Starts minikube (if not running)
+2. ✅ Creates namespaces (opamp-control, opamp-edge)
+3. ✅ Builds all Docker images
+4. ✅ Deploys cloud components (Server + Supervisor)
+5. ✅ Deploys 2 edge devices (device-1, device-2)
+6. ✅ Starts port-forward for UI access
 
-### 2. OpAMP Server (Port 4320)
-**Purpose:** Implements the OpAMP (Open Agent Management Protocol) specification to manage remote agents.
+After setup, access the UI at: **http://localhost:8080**
 
-**Functionality:**
-- **Agent Registration:** Accepts connections from supervisors via WebSocket
-- **Device Tracking:** Maintains state of all supervisors and their managed devices
-- **Configuration Distribution:** Pushes configuration updates to specific devices via their supervisor
-- **Status Collection:** Receives status updates and telemetry from devices through supervisors
+### Teardown
+```bash
+./scripts/teardown.sh
+```
 
-**How it works:**
-- Listens for OpAMP WebSocket connections on port 4320
-- Uses OpAMP protocol callbacks to handle:
-  - `OnConnecting`: Validates incoming connections
-  - `OnConnected`: Registers new supervisors
-  - `OnMessage`: Processes agent identification and status updates
-  - `OnConnectionClose`: Handles disconnections
-- Extracts device list from supervisor's non-identifying attributes
-- Maps device IDs to their managing supervisor for config routing
+---
 
-## Data Flow
+## 🔧 Manual Setup (Step by Step)
 
-### Device Registration Flow
-1. Supervisor connects to OpAMP Server via WebSocket
-2. Supervisor sends AgentDescription with:
-   - Identifying attributes (service.name = "supervisor")
-   - Non-identifying attributes (device count + device IDs)
-3. OpAMP Server registers supervisor and all its devices
-4. UI automatically shows new devices
+<details>
+<summary>Click to expand manual setup instructions</summary>
 
-### Configuration Push Flow
-1. Operator selects device in UI
-2. Operator enters desired OTel collector config (YAML)
-3. Operator clicks "Push Configuration"
-4. UI sends POST to `/api/agents/config` with deviceId and config
-5. OpAMP Server finds supervisor managing that device
-6. OpAMP Server creates RemoteConfig message with device-specific config
-7. OpAMP Server sends config to supervisor via OpAMP protocol
-8. Supervisor forwards config to device via gRPC stream
-9. Device agent applies config to its OTel collector
-10. UI shows success message ✅
+### 1. Start Minikube
+```bash
+minikube start -p control-plane --cpus=4 --memory=8192 --disk-size=20g
+```
 
-## API Endpoints
+### 2. Create Namespaces
+```bash
+kubectl --context control-plane create namespace opamp-control
+kubectl --context control-plane create namespace opamp-edge
+```
 
-### GET /
-Returns the dashboard HTML UI
+### 3. Build All Images
+```bash
+# Set Docker to use Minikube's daemon
+eval $(minikube -p control-plane docker-env)
 
-### GET /api/agents
-Returns list of all connected supervisors
+# Build server
+cd opamp-server
+docker build -t opamp-server:v1 .
+
+# Build supervisor
+cd ../opamp-supervisor
+docker build -t opamp-supervisor:v1 .
+
+# Build device-agent
+cd ../opamp-device-agent
+docker build -t opamp-device-agent:v1 .
+```
+
+### 4. Deploy Cloud Components
+```bash
+# Deploy OpAMP Server
+cd ../opamp-server
+kubectl --context control-plane apply -f opamp-server.yaml
+
+# Deploy OpAMP Supervisor
+cd ../opamp-supervisor
+kubectl --context control-plane apply -f k8s/supervisor.yaml
+
+# Wait for pods to be ready
+kubectl --context control-plane wait --for=condition=available --timeout=60s \
+  deployment/opamp-server deployment/opamp-supervisor -n opamp-control
+```
+
+### 5. Deploy Edge Devices
+```bash
+cd ../opamp-device-agent
+
+# Add devices dynamically (no hardcoded YAML needed!)
+./scripts/add-device.sh 1
+./scripts/add-device.sh 2
+```
+
+### 6. Start Port-Forward (Persistent)
+```bash
+cd ../opamp-server
+./scripts/start-port-forward.sh
+```
+
+### 7. Access UI
+```bash
+open http://localhost:8080
+```
+
+</details>
+
+---
+
+## 🎮 Using the System
+
+### View Devices via API
+```bash
+curl -s http://localhost:8080/api/devices | jq '.devices[] | {id, connected, emission_enabled}'
+```
+
+Expected output:
 ```json
 {
-  "agents": [
-    {
-      "ID": "supervisor-001",
-      "Name": "supervisor",
-      "Connected": true,
-      "IsSupervisor": true,
-      "Devices": ["device-1", "device-2"]
-    }
-  ]
+  "id": "device-1",
+  "connected": true,
+  "emission_enabled": false
+}
+{
+  "id": "device-2",
+  "connected": true,
+  "emission_enabled": false
 }
 ```
 
-### GET /api/devices
-Returns list of all OTel agents (devices)
+### Enable Data Emission via UI
+1. Open http://localhost:8080
+2. Click toggle for a device
+3. Toggle switches to ON (locked)
+4. Device starts emitting logs
+
+### Enable Data Emission via API
+```bash
+curl -X POST http://localhost:8080/api/devices/config \
+  -H "Content-Type: application/json" \
+  -d '{"devices": ["device-1"], "setEmission": true}'
+```
+
+### Verify Logs Flowing
+```bash
+kubectl --context control-plane logs -n opamp-edge -l app=fluentbit-device-1 --tail=10 -f
+```
+
+Expected output:
 ```json
-{
-  "devices": [
-    {
-      "ID": "device-1",
-      "Name": "device-1",
-      "Connected": true,
-      "Config": "...",
-      "SupervisorID": "supervisor-001"
-    }
-  ]
-}
+{"date":1768817248.726683,"message":"test log","level":"info"}
+{"date":1768817249.726873,"message":"test log","level":"info"}
+{"date":1768817250.726968,"message":"test log","level":"info"}
 ```
 
-### POST /api/agents/config
-Pushes configuration to a specific device
-```json
-{
-  "agentId": "device-1",
-  "config": "receivers:\n  otlp:\n    ..."
-}
-```
+(1 log per second)
 
-## Key Features in POC
+---
 
-1. **Centralized Management:** Single UI to manage all edge devices
-2. **Real-time Visibility:** Live connection status of all devices
-3. **Configuration Simplicity:** YAML-based config with template support
-4. **Error Handling:** Clear error messages for failed operations
-5. **Scalability:** Can manage multiple supervisors, each managing multiple devices
+## 🔧 Common Operations
 
-## Technology Stack
-- **Language:** Go
-- **OpAMP Library:** github.com/open-telemetry/opamp-go
-- **Web Framework:** Standard net/http
-- **Protocol:** WebSocket (OpAMP), HTTP/REST (UI API)
-
-## Deployment
-
-### Deploy the Server
+### Check Pod Status
 ```bash
-# Build Docker image (inside minikube Docker context)
-eval $(minikube docker-env)
-docker build -t opamp-server-ui:latest -f DockerFile .
+# Cloud components
+kubectl --context control-plane get pods -n opamp-control
 
-# Deploy to Kubernetes
-kubectl apply -f opamp-server.yaml
-
-# Verify deployment
-kubectl get pods -n opamp-system
+# Edge devices
+kubectl --context control-plane get pods -n opamp-edge
 ```
 
-### Access the UI (One-Time Setup)
+### View Logs
 ```bash
-# From the opamp-server directory, run:
-./start-ui-access.sh
+# Server logs
+kubectl --context control-plane logs -n opamp-control -l app=opamp-server -f
+
+# Supervisor logs
+kubectl --context control-plane logs -n opamp-control -l app=opamp-supervisor -f
+
+# Device-agent logs
+kubectl --context control-plane logs -n opamp-edge -l app=device-agent-1 -f
+
+# Fluent Bit logs
+kubectl --context control-plane logs -n opamp-edge -l app=fluentbit-device-1 -f
 ```
 
-This starts the UI in background. Open **http://localhost:4321** in your browser!
-
-To stop later: `./stop-ui-access.sh`
-
-**Note:** After Minikube restarts, just run `./start-ui-access.sh` again.
-
-### Kubernetes Resources
-- **Namespace:** `opamp-system`
-- **Deployment:** `opamp-server`
-- **Service:** `opamp-server` (ClusterIP, NodePort)
-- **Ports:**
-  - 4320: OpAMP WebSocket endpoint
-  - 4321: Web UI and API
-
-## Building
+### Restart Components After Code Changes
 ```bash
-# Build binary
-go build -o server ./cmd/server
+# Rebuild image
+eval $(minikube -p control-plane docker-env)
+cd opamp-server  # or opamp-supervisor, opamp-device-agent
+docker build -t <image-name>:<version> .
 
-# Build Docker image
-docker build -t opamp-server:latest -f DockerFile .
+# Restart deployment
+kubectl --context control-plane rollout restart deployment/<name> -n <namespace>
 ```
 
-## How This Enables E2E POC
-The OpAMP Server is the **control plane** of the POC. It:
-- Provides the **user interface** for operators
-- Implements the **OpAMP standard** for agent management
-- Acts as the **configuration source of truth**
-- Enables **remote management** of edge devices
-- Bridges **UI actions** to **device updates** seamlessly
+### Stop/Restart Port-Forward
+```bash
+# Stop
+cd opamp-server
+./scripts/stop-port-forward.sh
 
-Without this component, there would be no centralized way to manage configurations across distributed OTel collectors.
+# Start (persistent)
+./scripts/start-port-forward.sh
+```
+
+---
+
+## 🗑️ Cleanup
+
+### Remove All Deployments
+```bash
+cd opamp-server
+./scripts/teardown.sh
+```
+
+Or manually:
+```bash
+# Remove devices
+cd opamp-device-agent
+./scripts/remove-device.sh 1
+./scripts/remove-device.sh 2
+
+# Delete namespaces
+kubectl --context control-plane delete namespace opamp-control
+kubectl --context control-plane delete namespace opamp-edge
+
+# Stop port-forward
+cd opamp-server
+./scripts/stop-port-forward.sh
+```
+
+### Stop/Delete Minikube
+```bash
+# Stop (preserves everything)
+minikube stop -p control-plane
+
+# Delete completely
+minikube delete -p control-plane
+```
+
+---
+
+## 📊 System Behavior
+
+### Device Lifecycle
+
+```
+1. Device pods start
+         │
+         ▼
+2. Device-Agent connects to Supervisor (gRPC)
+         │
+         ▼
+3. Supervisor registers device in registry
+         │
+         ▼
+4. Supervisor reports to OpAMP Server (OpAMP)
+         │
+         ▼
+5. Device appears in UI (connected, emission OFF)
+         │
+         ▼
+6. User clicks toggle to enable emission
+         │
+         ▼
+7. Server → Supervisor → Device-Agent (config push)
+         │
+         ▼
+8. Device-Agent writes config to PVC
+         │
+         ▼
+9. Device-Agent calls Fluent Bit reload API
+         │
+         ▼
+10. Fluent Bit hot reloads (no restart)
+         │
+         ▼
+11. Fluent Bit starts emitting logs ✅
+```
+
+### Heartbeat System
+
+- Device-Agent sends messages every **30 seconds**
+- Supervisor updates `LastSeen` timestamp
+- If no message for **2 minutes** → device marked disconnected
+- Disconnected devices removed from UI automatically
+
+### One-Way Toggle Design
+
+**Why can't you turn OFF emission?**
+
+Fluent Bit's hot reload doesn't cleanly support disabling all inputs/outputs. Instead of risking broken configs, the design is:
+
+- **OFF → ON**: Allowed (adds config)
+- **ON → OFF**: Blocked (prevents issues)
+- **Policy**: Reduce data volume, don't stop collection
+
+---
+
+## 🐛 Troubleshooting
+
+### UI Shows No Devices
+
+**Check:**
+```bash
+# Are devices pods running?
+kubectl --context control-plane get pods -n opamp-edge
+
+# Are device-agents connected?
+kubectl --context control-plane logs -n opamp-edge -l app=device-agent-1 | grep "Connected"
+
+# Is supervisor receiving connections?
+kubectl --context control-plane logs -n opamp-control -l app=opamp-supervisor | grep "device-1"
+```
+
+### Toggle Not Working
+
+**Check:**
+```bash
+# Did device receive config?
+kubectl --context control-plane logs -n opamp-edge -l app=device-agent-1 | grep "ConfigPush"
+
+# Was reload API called?
+kubectl --context control-plane logs -n opamp-edge -l app=device-agent-1 | grep "reload API"
+
+# Did Fluent Bit reload?
+kubectl --context control-plane logs -n opamp-edge -l app=fluentbit-device-1 | tail -20
+```
+
+### Port-Forward Died
+
+**Restart:**
+```bash
+cd opamp-server
+./scripts/stop-port-forward.sh
+./scripts/start-port-forward.sh
+```
+
+Check logs:
+```bash
+tail -f /tmp/opamp-port-forward.log
+```
+
+### PVC Mount Issues
+
+**Verify:**
+```bash
+# Check PVC status
+kubectl --context control-plane get pvc -n opamp-edge
+
+# Check both pods mount same PVC
+kubectl --context control-plane describe pod <device-agent-pod> -n opamp-edge | grep -A5 "Volumes"
+kubectl --context control-plane describe pod <fluentbit-pod> -n opamp-edge | grep -A5 "Volumes"
+```
+
+---
+
+## 📁 Repository Structure
+
+```
+opamp-server/
+├── cmd/server/main.go          # Server entry point
+├── internal/ui/dashboard.html  # Web UI
+├── opamp-server.yaml          # K8s deployment
+├── scripts/
+│   ├── setup.sh               # One-command full setup
+│   ├── teardown.sh            # Remove all resources
+│   ├── start-port-forward.sh  # Persistent port-forward
+│   ├── stop-port-forward.sh   # Stop port-forward
+│   ├── start-ui-access.sh     # Start UI access
+│   └── stop-ui-access.sh      # Stop UI access
+└── README.md                  # This file
+
+opamp-supervisor/
+├── cmd/supervisor/main.go     # Supervisor entry point
+├── internal/
+│   ├── server/control.go      # gRPC server
+│   ├── server/opamp_bridge.go # OpAMP client
+│   └── runtime/persistence.go # Device registry
+└── k8s/supervisor.yaml        # K8s deployment
+
+opamp-device-agent/
+├── main.go                    # Device-agent entry point
+├── k8s/                       # (empty - devices created dynamically)
+├── scripts/
+│   ├── add-device.sh         # Dynamically add devices
+│   └── remove-device.sh      # Remove devices
+└── Dockerfile                 # Container build
+```
+
+---
+
+## 🔑 Key Files
+
+### Server
+- **[internal/ui/dashboard.html](internal/ui/dashboard.html)** - Web UI with device list and toggles
+- **[cmd/server/main.go](cmd/server/main.go)** - API handlers, OpAMP server logic
+
+### Supervisor
+- **[internal/server/control.go](../opamp-supervisor/internal/server/control.go)** - gRPC server for devices
+- **[internal/runtime/persistence.go](../opamp-supervisor/internal/runtime/persistence.go)** - Device registry and heartbeat
+
+### Device-Agent
+- **[main.go](../opamp-device-agent/main.go)** - Config management, hot reload logic
+
+---
+
+## ⏱️ Timing
+
+- **First-time setup**: 10-15 minutes
+- **Add 1 device**: ~30 seconds
+- **Config update**: ~2 seconds (hot reload)
+- **Device appears in UI**: ~3 seconds after connection
+
+---
+
+## 🎓 Learn More
+
+- **OpAMP Spec**: https://opentelemetry.io/docs/specs/opamp/
+- **Fluent Bit**: https://docs.fluentbit.io/
+- **Hot Reload API**: https://docs.fluentbit.io/manual/administration/hot-reload
+
+---
+
+**Questions?** Check logs first - they show exactly what's happening! 📝

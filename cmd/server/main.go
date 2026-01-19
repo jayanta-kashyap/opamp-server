@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -36,11 +38,16 @@ type Agent struct {
 }
 
 type Device struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Connected    bool   `json:"connected"`
-	Config       string `json:"config"`
-	SupervisorID string `json:"supervisor_id"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Connected       bool   `json:"connected"`
+	Config          string `json:"config"`
+	SupervisorID    string `json:"supervisor_id"`
+	ConfigStatus    string `json:"config_status,omitempty"`
+	LastConfigHash  string `json:"last_config_hash,omitempty"`
+	AgentType       string `json:"agent_type,omitempty"`
+	Pipeline        string `json:"pipeline,omitempty"`
+	EmissionEnabled bool   `json:"emission_enabled"`
 }
 
 type OpAMPServer struct {
@@ -112,33 +119,95 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 		}
 	}
 
-	// If this is a supervisor, extract device list from non-identifying attributes
+	// If this is a supervisor, extract device list and status info from non-identifying attributes
 	if agent.IsSupervisor && msg.AgentDescription != nil && msg.AgentDescription.NonIdentifyingAttributes != nil {
 		deviceList := []string{}
 		deviceCount := 0
+		deviceTypes := make(map[string]string)
+
+		// First pass: collect device types
+		for _, attr := range msg.AgentDescription.NonIdentifyingAttributes {
+			if len(attr.Key) > 12 && attr.Key[:12] == "device.type." {
+				devID := attr.Key[12:]
+				deviceTypes[devID] = attr.Value.GetStringValue()
+			}
+		}
 
 		for _, attr := range msg.AgentDescription.NonIdentifyingAttributes {
 			if attr.Key == "device.count" {
 				deviceCount = int(attr.Value.GetIntValue())
-			} else if len(attr.Key) > 7 && attr.Key[:7] == "device." {
+			} else if len(attr.Key) > 10 && attr.Key[:10] == "device.id." {
+				// Only process device.id.X entries as device IDs
 				deviceID := attr.Value.GetStringValue()
+				// Skip empty device IDs
+				if deviceID == "" {
+					continue
+				}
 				deviceList = append(deviceList, deviceID)
 
 				// Create or update device entry
 				device, devExists := s.devices[deviceID]
 				if !devExists {
+					// Use agent type from supervisor if provided, otherwise use metadata
+					agentType := deviceTypes[deviceID]
+					if agentType == "" {
+						agentType, _ = getDeviceMetadata(deviceID)
+					}
+					defaultConfig := getDefaultConfig(deviceID)
+					pipeline := parsePipelinesFromConfig(defaultConfig)
 					device = &Device{
 						ID:           deviceID,
 						Name:         deviceID,
 						Connected:    true,
 						SupervisorID: agentID,
-						Config:       getDefaultConfig(deviceID), // Load default config
+						Config:       defaultConfig,
+						AgentType:    agentType,
+						Pipeline:     pipeline,
 					}
 					s.devices[deviceID] = device
-					log.Printf("Registered new device: %s via supervisor %s with default config", deviceID, agentID)
+					log.Printf("Registered new device: %s via supervisor %s (type=%s, pipeline=%s)", deviceID, agentID, agentType, pipeline)
 				} else {
 					device.Connected = true
 					device.SupervisorID = agentID
+					oldPipeline := device.Pipeline
+					// Update agent type if provided
+					if deviceTypes[deviceID] != "" {
+						device.AgentType = deviceTypes[deviceID]
+					}
+					// Parse pipeline from actual config
+					device.Pipeline = parsePipelinesFromConfig(device.Config)
+					if oldPipeline != device.Pipeline {
+						log.Printf("Updated device %s pipeline: %s -> %s (from config)", deviceID, oldPipeline, device.Pipeline)
+					}
+				}
+			} else if len(attr.Key) > 14 && attr.Key[:14] == "device.status." {
+				devID := attr.Key[14:]
+				dev, ok := s.devices[devID]
+				if ok {
+					dev.ConfigStatus = attr.Value.GetStringValue()
+					log.Printf("Device %s status updated: %s", devID, dev.ConfigStatus)
+				}
+			} else if len(attr.Key) > 14 && attr.Key[:14] == "device.config." {
+				devID := attr.Key[14:]
+				dev, ok := s.devices[devID]
+				if ok {
+					actualConfig := attr.Value.GetStringValue()
+					if actualConfig != "" && actualConfig != dev.Config {
+						oldPipeline := dev.Pipeline
+						oldEmission := dev.EmissionEnabled
+						dev.Config = actualConfig
+						dev.Pipeline = parsePipelinesFromConfig(actualConfig)
+						dev.EmissionEnabled = detectEmissionFromConfig(actualConfig)
+						log.Printf("Device %s config updated from device, pipeline: %s -> %s, emission: %v -> %v", 
+							devID, oldPipeline, dev.Pipeline, oldEmission, dev.EmissionEnabled)
+					}
+				}
+			} else if len(attr.Key) > 12 && attr.Key[:12] == "device.hash." {
+				devID := attr.Key[12:]
+				dev, ok := s.devices[devID]
+				if ok {
+					dev.LastConfigHash = attr.Value.GetStringValue()
+					log.Printf("Device %s last config hash updated: %s", devID, dev.LastConfigHash)
 				}
 			}
 		}
@@ -146,7 +215,7 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 		agent.Devices = deviceList
 		log.Printf("Supervisor %s reports %d devices: %v", agentID, deviceCount, deviceList)
 
-		// Mark devices not in current list as disconnected
+		// Delete devices not in current list (no persistence - re-register on reconnect)
 		for devID, dev := range s.devices {
 			if dev.SupervisorID == agentID {
 				found := false
@@ -157,8 +226,8 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 					}
 				}
 				if !found {
-					dev.Connected = false
-					log.Printf("Device %s disconnected from supervisor %s", devID, agentID)
+					delete(s.devices, devID)
+					log.Printf("Device %s removed (disconnected from supervisor %s)", devID, agentID)
 				}
 			}
 		}
@@ -178,8 +247,16 @@ func (s *OpAMPServer) OnConnectionClose(conn types.Connection) {
 	s.mu.Lock()
 	for id, agent := range s.agents {
 		if agent.conn == conn {
-			agent.Connected = false
-			log.Printf("Agent %s disconnected", id)
+			// Delete all devices associated with this agent
+			for devID, dev := range s.devices {
+				if dev.SupervisorID == id {
+					delete(s.devices, devID)
+					log.Printf("Device %s removed (agent %s disconnected)", devID, id)
+				}
+			}
+			// Delete the agent
+			delete(s.agents, id)
+			log.Printf("Agent %s removed (disconnected)", id)
 			break
 		}
 	}
@@ -213,13 +290,22 @@ func (s *OpAMPServer) GetDevices() []Device {
 	devices := make([]Device, 0, len(s.devices))
 	for _, device := range s.devices {
 		devices = append(devices, Device{
-			ID:           device.ID,
-			Name:         device.Name,
-			Connected:    device.Connected,
-			Config:       device.Config,
-			SupervisorID: device.SupervisorID,
+			ID:              device.ID,
+			Name:            device.Name,
+			Connected:       device.Connected,
+			Config:          device.Config,
+			SupervisorID:    device.SupervisorID,
+			ConfigStatus:    device.ConfigStatus,
+			LastConfigHash:  device.LastConfigHash,
+			AgentType:       device.AgentType,
+			Pipeline:        device.Pipeline,
+			EmissionEnabled: device.EmissionEnabled,
 		})
 	}
+	// Sort devices by ID for consistent ordering
+	sort.Slice(devices, func(i, j int) bool {
+		return devices[i].ID < devices[j].ID
+	})
 	return devices
 }
 
@@ -239,6 +325,43 @@ func (s *OpAMPServer) GetDevice(id string) (*Device, bool) {
 		Config:       device.Config,
 		SupervisorID: device.SupervisorID,
 	}, true
+}
+
+func (s *OpAMPServer) SetDeviceEmission(id string, enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if device, exists := s.devices[id]; exists {
+		device.EmissionEnabled = enabled
+		log.Printf("Device %s emission set to %v", id, enabled)
+	}
+}
+
+func (s *OpAMPServer) DeleteDevice(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.devices[id]; exists {
+		delete(s.devices, id)
+		log.Printf("Device %s deleted", id)
+		return true
+	}
+	return false
+}
+
+func (s *OpAMPServer) CleanupStaleDevices() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	count := 0
+	for id, device := range s.devices {
+		if !device.Connected {
+			delete(s.devices, id)
+			log.Printf("Cleaned up stale device: %s", id)
+			count++
+		}
+	}
+	return count
 }
 
 func (s *OpAMPServer) GetAgent(id string) (*Agent, bool) {
@@ -286,8 +409,11 @@ func (s *OpAMPServer) PushConfig(deviceID, config string) error {
 		return fmt.Errorf("supervisor %s is not connected", supervisorID)
 	}
 
-	// Store the config
+	// Store the config and update metadata
 	device.Config = config
+	device.Pipeline = parsePipelinesFromConfig(config)
+	device.AgentType = detectAgentTypeFromConfig(config)
+	device.EmissionEnabled = detectEmissionFromConfig(config)
 
 	// Create RemoteConfig message with device ID as key
 	remoteConfig := &protobufs.AgentRemoteConfig{
@@ -323,84 +449,82 @@ func (s *OpAMPServer) PushConfig(deviceID, config string) error {
 }
 
 func getDefaultConfig(deviceID string) string {
-	// Return the default configuration for each device based on its ID
-	// These match the ConfigMaps deployed in Kubernetes
-	configs := map[string]string{
-		"device-1": `receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
-processors:
-  batch:
-    timeout: 1s
-    send_batch_size: 1024
-exporters:
-  debug:
-    verbosity: detailed
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [debug]
-  telemetry:
-    logs:
-      level: info`,
-		"device-2": `receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
-processors:
-  batch:
-    timeout: 1s
-    send_batch_size: 1024
-exporters:
-  debug:
-    verbosity: detailed
-service:
-  pipelines:
-    metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [debug]
-  telemetry:
-    logs:
-      level: info`,
-		"device-3": `receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
-processors:
-  batch:
-    timeout: 1s
-    send_batch_size: 1024
-exporters:
-  debug:
-    verbosity: detailed
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [debug]
-  telemetry:
-    logs:
-      level: info`,
-	}
+	// Simple default config for Fluent Bit only
+	return `[SERVICE]
+    flush        5
+    daemon       Off
+    log_level    info
+    http_server  On
+    http_listen  0.0.0.0
+    http_port    2020
+    hot_reload   On
 
-	if config, exists := configs[deviceID]; exists {
-		return config
+[INPUT]
+    name         dummy
+    tag          logs
+    dummy        {"message":"test log","level":"info"}
+    rate         1
+
+[OUTPUT]
+    name         stdout
+    match        *
+    format       json_lines`
+}
+
+func getDeviceMetadata(deviceID string) (agentType, pipeline string) {
+	// All devices are Fluent Bit with logs pipeline
+	return "fluentbit", "logs"
+}
+
+// parsePipelinesFromConfig extracts pipeline names from Fluent Bit config
+func parsePipelinesFromConfig(config string) string {
+	// For Fluent Bit configs, always return logs
+	if strings.Contains(config, "[SERVICE]") || strings.Contains(config, "[INPUT]") {
+		return "logs"
 	}
-	return "# No default configuration available"
+	return "unknown"
+}
+
+// detectAgentTypeFromConfig determines agent type from config format
+func detectAgentTypeFromConfig(config string) string {
+	// Fluent Bit uses INI-style config with [SECTIONS]
+	if strings.Contains(config, "[SERVICE]") || strings.Contains(config, "[INPUT]") || strings.Contains(config, "[OUTPUT]") {
+		return "fluentbit"
+	}
+	return "unknown"
+}
+
+// detectEmissionFromConfig determines if data emission is enabled based on config content
+func detectEmissionFromConfig(config string) bool {
+	// For Fluent Bit: check if there's an [OUTPUT] section that's not null
+	if strings.Contains(config, "[OUTPUT]") {
+		// Check if output is explicitly set to null
+		lines := strings.Split(config, "\n")
+		inOutput := false
+		hasValidOutput := false
+		
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "[OUTPUT]" {
+				inOutput = true
+				hasValidOutput = true // Assume valid unless proven otherwise
+				continue
+			}
+			// New section starts
+			if inOutput && strings.HasPrefix(trimmed, "[") {
+				break
+			}
+			// Check for null output
+			if inOutput && strings.Contains(strings.ToLower(trimmed), "name") && strings.Contains(strings.ToLower(trimmed), "null") {
+				hasValidOutput = false
+				break
+			}
+		}
+		return hasValidOutput
+	}
+	
+	// If we can't determine, assume emission is off for safety
+	return false
 }
 
 func main() {
@@ -476,6 +600,54 @@ func main() {
 		})
 	})
 
+	// API: Delete a device
+	mux.HandleFunc("/api/devices/delete", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DeviceID string `json:"deviceId"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.DeviceID == "" {
+			http.Error(w, "deviceId is required", http.StatusBadRequest)
+			return
+		}
+
+		if opampServer.DeleteDevice(req.DeviceID) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": true,
+				"message": fmt.Sprintf("Device %s deleted", req.DeviceID),
+			})
+		} else {
+			http.Error(w, "Device not found", http.StatusNotFound)
+		}
+	})
+
+	// API: Cleanup stale (disconnected) devices
+	mux.HandleFunc("/api/devices/cleanup", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		count := opampServer.CleanupStaleDevices()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": fmt.Sprintf("Cleaned up %d stale devices", count),
+			"count":   count,
+		})
+	})
+
 	// API: Get device config
 	mux.HandleFunc("/api/devices/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -545,9 +717,10 @@ func main() {
 		}
 
 		var req struct {
-			DeviceID string `json:"deviceId"`
-			AgentID  string `json:"agentId"` // Support both field names
-			Config   string `json:"config"`
+			DeviceID    string `json:"deviceId"`
+			AgentID     string `json:"agentId"` // Support both field names
+			Config      string `json:"config"`
+			SetEmission *bool  `json:"setEmission,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -561,13 +734,36 @@ func main() {
 			deviceID = req.AgentID
 		}
 
-		if err := opampServer.PushConfig(deviceID, req.Config); err != nil {
+		// If setEmission is true but no config provided, use default config
+		config := req.Config
+		if req.SetEmission != nil && *req.SetEmission && config == "" {
+			config = getDefaultConfig(deviceID)
+		}
+
+		if err := opampServer.PushConfig(deviceID, config); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"error": err.Error(),
 			})
 			return
+		}
+
+		// Update emission state if specified - ONLY allow enabling, not disabling
+		if req.SetEmission != nil {
+			if *req.SetEmission {
+				// Allow enabling emission
+				opampServer.SetDeviceEmission(deviceID, true)
+			} else {
+				// Reject disabling emission
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": false,
+					"error":   "Cannot disable emission once started. Use config policies to reduce data emission.",
+				})
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
