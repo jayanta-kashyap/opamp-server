@@ -12,6 +12,7 @@ Implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs
 - [Feature Matrix](#-feature-matrix)
   - [Performance & Scale](#performance--scale)
   - [API Endpoints](#api-endpoints)
+  - [Dashboard UI Features](#-dashboard-ui-features)
 - [OpAMP Protocol Functions Used](#opamp-protocol-functions-used)
   - [Pod Separation Design in the Edge Device](#pod-separation-design-in-the-edge-device)
 - [Prerequisites](#-prerequisites)
@@ -19,6 +20,10 @@ Implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs
 - [Quick Setup (One Command)](#-quick-setup-one-command)
 - [Manual Setup (Step by Step)](#-manual-setup-step-by-step)
 - [Using the System](#-using-the-system)
+  - [Deploy/Remove Devices via UI](#deployrremove-devices-via-ui-poc-provisioner)
+  - [Apply Data Policies via UI](#apply-data-policies-via-ui)
+  - [Push Custom FluentBit Config](#push-custom-fluentbit-config)
+  - [Toggle Data Emission](#toggle-data-emission-via-ui)
 - [Common Operations](#-common-operations)
 - [Cleanup](#️-cleanup)
 - [System Behavior](#-system-behavior)
@@ -87,10 +92,11 @@ Each Device:
 |----------|----------|
 | **Device Management** | Auto-registration, Heartbeat (2min timeout), Runtime monitoring (30s) |
 | **Configuration** | Remote config push, Hot reload (zero downtime), PVC persistence |
-| **Dashboard** | Device list, Dual-panel view, Data Emission toggle (ON↔OFF) |
-| **Rate Limiting** | Throttle logs per window, Window: 1-60s, Rate: 1-1000 |
-| **Log Level Filter** | Grep by level (INFO/WARN/ERROR), Keep or Exclude mode |
-| **Field Removal** | Modify filter, Remove sensitive fields, Comma-separated |
+| **Dashboard** | Device list, Dual-panel view, Real-time config display, Per-device delete buttons |
+| **Emission Toggle** | Bi-directional ON↔OFF toggle, New devices start with emission OFF |
+| **Policy-Based Config** | Throttle, Grep (log level filter), Modify (field removal), Live preview |
+| **Custom Config Push** | Raw FluentBit config push with pre-populated template |
+| **POC Provisioner** | UI-based device deploy/remove (no kubectl needed) |
 
 ---
 
@@ -111,6 +117,45 @@ Each Device:
 | `GET` | `/api/devices/{id}/config` | Get current config for a device |
 | `POST` | `/api/devices/config` | Push new config to a device |
 | `POST` | `/api/devices/emission` | Toggle data emission for a device |
+
+---
+
+### 🎨 Dashboard UI Features
+
+The dashboard provides a comprehensive interface for managing edge devices:
+
+#### Device List (Left Sidebar)
+- **Device cards** with status indicator (online/offline)
+- **Emission badge** showing EMITTING or OFF status
+- **🗑️ Delete button** on each device for targeted removal
+- **➕ Deploy Test Device** button (POC Provisioner)
+- **Search** to filter devices
+- **Stats** showing total devices, online count, emitting count
+
+#### Device Detail Panel (Right Side)
+When a device is selected:
+
+| Section | Description |
+|---------|-------------|
+| **Data Emission Toggle** | ON/OFF switch with lock indicator during updates |
+| **Data Policies** | Throttle, Grep (log level), Modify (field removal) |
+| **Config Preview** | Live preview of generated FluentBit config |
+| **Push Custom Config** | Raw config textarea with pre-populated template |
+| **Current Live Config** | Real-time display of device's actual config |
+
+#### Policy Options
+
+| Policy | Options | Description |
+|--------|---------|-------------|
+| **Throttle** | Rate: 1-1000, Window: 1-60s | Limit log throughput |
+| **Grep** | Field + Levels (INFO/WARN/ERROR/DEBUG) | Filter logs by level |
+| **Modify** | Fields (password, token, secret, etc.) | Remove sensitive fields |
+
+#### Emission Behavior
+- **New devices** start with emission **OFF** (silent config)
+- **Toggle ON** → Pushes full config with INPUT/OUTPUT sections
+- **Toggle OFF** → Pushes silent config (SERVICE section only)
+- **Push Custom Config** → Auto-enables emission
 
 ---
 
@@ -301,9 +346,39 @@ open http://localhost:8080
 
 ## 🎮 Using the System
 
+### Deploy/Remove Devices via UI (POC Provisioner)
+
+The POC Provisioner allows deploying and removing test devices directly from the dashboard - no kubectl needed!
+
+1. Open http://localhost:4321
+2. Click **"➕ Deploy Test Device"** to add a new device
+3. Device auto-registers and appears in list within seconds
+4. Click **"🗑️"** button on any device to remove it
+
+**Note:** The POC Provisioner runs as a separate service in `opamp-control` namespace with its own port-forward on `:8090`.
+
+### Apply Data Policies via UI
+
+1. Select a device from the sidebar
+2. Enable desired policies:
+   - **Throttle**: Set rate (logs/sec) and window (seconds)
+   - **Grep**: Select log levels to keep (INFO, WARN, ERROR, DEBUG)
+   - **Modify**: Select sensitive fields to remove (password, token, secret, etc.)
+3. Preview the generated config in the **Config Preview** section
+4. Click **"Apply Policies"** to push the config
+5. View the applied config in **"Current Live Config"**
+
+### Push Custom FluentBit Config
+
+1. Select a device
+2. Scroll to **"Push Custom Config"** section
+3. Template is pre-populated with a working FluentBit config
+4. Modify as needed
+5. Click **"Push Config"** → Config is applied and emission is auto-enabled
+
 ### View Devices via API
 ```bash
-curl -s http://localhost:8080/api/devices | jq '.devices[] | {id, connected, emission_enabled}'
+curl -s http://localhost:4321/api/devices | jq '.devices[] | {id, connected, emission_enabled}'
 ```
 
 Expected output:
@@ -321,20 +396,21 @@ Expected output:
 ```
 
 ### Toggle Data Emission via UI
-1. Open http://localhost:8080
-2. Click toggle for a device
-3. **Toggle ON** → Device starts emitting logs
-4. **Toggle OFF** → Device stops emitting (silent config pushed)
+1. Open http://localhost:4321
+2. Select a device from the sidebar
+3. Click the **Data Emission** toggle
+4. **Toggle ON** → Device starts emitting logs
+5. **Toggle OFF** → Device stops emitting (silent config pushed)
 
 ### Toggle Data Emission via API
 ```bash
 # Enable emission
-curl -X POST http://localhost:8080/api/devices/config \
+curl -X POST http://localhost:4321/api/devices/config \
   -H "Content-Type: application/json" \
   -d '{"deviceId": "device-1", "setEmission": true}'
 
 # Disable emission
-curl -X POST http://localhost:8080/api/devices/config \
+curl -X POST http://localhost:4321/api/devices/config \
   -H "Content-Type: application/json" \
   -d '{"deviceId": "device-1", "setEmission": false}'
 ```

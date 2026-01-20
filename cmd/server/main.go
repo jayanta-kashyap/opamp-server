@@ -153,19 +153,21 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 					if agentType == "" {
 						agentType, _ = getDeviceMetadata(deviceID)
 					}
-					defaultConfig := getDefaultConfig(deviceID)
+					// New devices start with silent config (emission OFF)
+					defaultConfig := getSilentConfig()
 					pipeline := parsePipelinesFromConfig(defaultConfig)
 					device = &Device{
-						ID:           deviceID,
-						Name:         deviceID,
-						Connected:    true,
-						SupervisorID: agentID,
-						Config:       defaultConfig,
-						AgentType:    agentType,
-						Pipeline:     pipeline,
+						ID:              deviceID,
+						Name:            deviceID,
+						Connected:       true,
+						SupervisorID:    agentID,
+						Config:          defaultConfig,
+						AgentType:       agentType,
+						Pipeline:        pipeline,
+						EmissionEnabled: false, // New devices start with emission OFF
 					}
 					s.devices[deviceID] = device
-					log.Printf("Registered new device: %s via supervisor %s (type=%s, pipeline=%s)", deviceID, agentID, agentType, pipeline)
+					log.Printf("Registered new device: %s via supervisor %s (type=%s, emission=OFF)", deviceID, agentID, agentType)
 				} else {
 					device.Connected = true
 					device.SupervisorID = agentID
@@ -198,7 +200,7 @@ func (s *OpAMPServer) OnMessage(ctx context.Context, conn types.Connection, msg 
 						dev.Config = actualConfig
 						dev.Pipeline = parsePipelinesFromConfig(actualConfig)
 						dev.EmissionEnabled = detectEmissionFromConfig(actualConfig)
-						log.Printf("Device %s config updated from device, pipeline: %s -> %s, emission: %v -> %v", 
+						log.Printf("Device %s config updated from device, pipeline: %s -> %s, emission: %v -> %v",
 							devID, oldPipeline, dev.Pipeline, oldEmission, dev.EmissionEnabled)
 					}
 				}
@@ -514,7 +516,7 @@ func detectEmissionFromConfig(config string) bool {
 		lines := strings.Split(config, "\n")
 		inOutput := false
 		hasValidOutput := false
-		
+
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if trimmed == "[OUTPUT]" {
@@ -534,7 +536,7 @@ func detectEmissionFromConfig(config string) bool {
 		}
 		return hasValidOutput
 	}
-	
+
 	// If we can't determine, assume emission is off for safety
 	return false
 }

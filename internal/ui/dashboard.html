@@ -115,6 +115,17 @@
         }
         .emission-tag.on { background: rgba(76, 175, 80, 0.3); color: #81c784; }
         .emission-tag.off { background: rgba(100, 100, 100, 0.3); color: #888; }
+        .device-delete-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85em;
+            padding: 2px 4px;
+            border-radius: 4px;
+            opacity: 0.5;
+            transition: all 0.15s;
+        }
+        .device-delete-btn:hover { opacity: 1; background: rgba(255, 0, 0, 0.1); }
         
         /* Main Content - No Selection */
         .no-selection {
@@ -545,6 +556,14 @@
                 <p>Edge Device Management</p>
             </div>
             
+            <!-- POC: Deploy Test Device -->
+            <div class="poc-deploy-section" style="padding:10px 20px;border-bottom:1px solid rgba(0,0,0,0.1);">
+                <button class="btn btn-primary" style="width:100%;padding:8px;font-size:0.8em;" onclick="deployTestDevice()">
+                    ➕ Deploy Test Device
+                </button>
+                <div style="font-size:0.65em;color:#888;margin-top:5px;text-align:center;">POC Only • Click 🗑️ on device to remove</div>
+            </div>
+            
             <div class="stats-row">
                 <div class="stat-box">
                     <div class="stat-value" id="totalDevices">0</div>
@@ -874,11 +893,17 @@
             var html = '';
             filtered.forEach(function(d) {
                 var sel = state.selected === d.id ? 'selected' : '';
+                var deviceNum = d.id.match(/device-(\d+)/);
+                var canDelete = deviceNum ? true : false;
                 html += '<div class="device-item ' + sel + '" onclick="selectDevice(\'' + d.id + '\')">';
                 html += '<div class="device-item-header">';
                 html += '<span class="device-item-name">' + d.id + '</span>';
+                html += '<div style="display:flex;gap:6px;align-items:center;">';
+                if (canDelete) {
+                    html += '<button class="device-delete-btn" onclick="event.stopPropagation();removeDevice(' + deviceNum[1] + ')" title="Remove ' + d.id + '">🗑️</button>';
+                }
                 html += '<span class="device-item-badge">FB</span>';
-                html += '</div>';
+                html += '</div></div>';
                 html += '<div class="device-item-meta">';
                 html += '<span class="status-dot ' + (d.connected ? 'online' : 'offline') + '"></span>';
                 html += '<span class="meta-tag">' + (d.pipeline || 'default') + '</span>';
@@ -899,6 +924,9 @@
             
             var d = state.devices.find(function(x) { return x.id === id; });
             updateEmissionUI(d ? d.emission_enabled : false);
+            
+            // Pre-populate raw config area with template (helps users unfamiliar with FluentBit)
+            document.getElementById('rawConfigArea').value = getDefaultBaseConfig();
             
             resetPolicies();
             refreshConfig();
@@ -1233,7 +1261,11 @@
             .then(function(res) {
                 if (res.success) {
                     showToast('Policies applied to ' + state.selected, 'success');
-                    setTimeout(refreshConfig, 500);
+                    // Refresh both config display AND state.devices
+                    setTimeout(function() {
+                        refreshConfig();
+                        fetchDevices();
+                    }, 500);
                 } else {
                     showToast('Failed: ' + (res.error || 'Unknown error'), 'error');
                 }
@@ -1302,15 +1334,10 @@
         }
 
         function loadDefaultTemplate() {
-            // Load current device config or default template
-            var d = state.devices.find(function(x) { return x.id === state.selected; });
-            if (d && d.config) {
-                document.getElementById('rawConfigArea').value = d.config;
-                showToast('Current config loaded', 'success');
-            } else {
-                document.getElementById('rawConfigArea').value = getDefaultBaseConfig();
-                showToast('Default template loaded', 'success');
-            }
+            // Always load full template with INPUT/OUTPUT for custom config editing
+            // This helps users when emission is OFF (device only has SERVICE section)
+            document.getElementById('rawConfigArea').value = getDefaultBaseConfig();
+            showToast('Template loaded (with INPUT/OUTPUT)', 'success');
         }
 
         // ============== Toast ==============
@@ -1323,6 +1350,74 @@
             toastTimer = setTimeout(function() {
                 toast.classList.remove('show');
             }, 4000);
+        }
+
+        // ============== POC Provisioner ==============
+        var PROVISIONER_URL = 'http://localhost:8090';
+        
+        function getNextDeviceId() {
+            if (state.devices.length === 0) return 1;
+            var maxId = 0;
+            state.devices.forEach(function(d) {
+                var match = d.id.match(/device-(\d+)/);
+                if (match) {
+                    var id = parseInt(match[1]);
+                    if (id > maxId) maxId = id;
+                }
+            });
+            return maxId + 1;
+        }
+        
+        function deployTestDevice() {
+            var nextId = getNextDeviceId();
+            showToast('Deploying device-' + nextId + '...', 'info');
+            
+            fetch(PROVISIONER_URL + '/api/deploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceId: nextId })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    showToast('device-' + nextId + ' deployed! Waiting for registration...', 'success');
+                    setTimeout(fetchDevices, 2000);
+                } else {
+                    showToast('Deploy failed: ' + res.error, 'error');
+                }
+            })
+            .catch(function(e) {
+                showToast('Provisioner unavailable. Deploy manually with scripts.', 'error');
+            });
+        }
+        
+        function removeDevice(deviceId) {
+            if (!confirm('Remove device-' + deviceId + '?')) return;
+            
+            showToast('Removing device-' + deviceId + '...', 'info');
+            
+            fetch(PROVISIONER_URL + '/api/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceId: deviceId })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    showToast('device-' + deviceId + ' removed!', 'success');
+                    if (state.selected === 'device-' + deviceId) {
+                        state.selected = null;
+                        document.getElementById('noSelection').style.display = 'flex';
+                        document.getElementById('deviceDetail').classList.remove('active');
+                    }
+                    setTimeout(fetchDevices, 1000);
+                } else {
+                    showToast('Remove failed: ' + res.error, 'error');
+                }
+            })
+            .catch(function(e) {
+                showToast('Provisioner unavailable. Remove manually with scripts.', 'error');
+            });
         }
 
         // ============== Event Listeners ==============
