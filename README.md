@@ -9,9 +9,7 @@ Implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs
 - [What This POC Demonstrates](#-what-this-poc-demonstrates)
   - [Architecture Overview](#architecture-overview)
   - [Core Capabilities](#core-capabilities)
-  - [Data Policies](#data-policies)
 - [Feature Matrix](#-feature-matrix)
-  - [Server Capabilities](#server-capabilities)
   - [Performance & Scale](#performance--scale)
   - [API Endpoints](#api-endpoints)
 - [OpAMP Protocol Functions Used](#opamp-protocol-functions-used)
@@ -85,30 +83,14 @@ Each Device:
 
 ### Core Capabilities
 
-✅ Remote device management via OpAMP  |  ✅ Hot reload (zero downtime)  |  ✅ Auto-registration  
-✅ Heartbeat tracking (2min timeout)  |  ✅ Runtime monitoring (30s)  |  ✅ Web dashboard  
-✅ Separate pods (agent + fluentbit)  |  ✅ Shared PVC storage  |  ✅ One-way toggle (OFF→ON)
-
-### Data Policies
-
-| Throttle | Grep | Modify |
-|----------|------|--------|
-| Rate limit logs/window | Filter by log level | Remove fields |
-| Window: 1-60s | Keep/Exclude patterns | Bulk field removal |
-| Print status | Regex matching | Dot-notation support |
-
----
-
-## 🚀 Feature Matrix
-
-### Server Capabilities
-
-| Protocol | Config | Policies | UI | Architecture |
-|----------|--------|----------|-----|--------------|
-| OpAMP WebSocket | Remote Push | Throttle | Web Dashboard | Pod Separation |
-| gRPC Streams | Hot Reload | Grep Filter | Dual-Panel | Shared PVC |
-| Heartbeat 30s | PVC Persistence | Modify Fields | Emission Toggle | K8s Native |
-| Protobuf | Templates | Policy Builder | Device List | Namespace Isolation |
+| Category | Features |
+|----------|----------|
+| **Device Management** | Auto-registration, Heartbeat (2min timeout), Runtime monitoring (30s) |
+| **Configuration** | Remote config push, Hot reload (zero downtime), PVC persistence |
+| **Dashboard** | Device list, Dual-panel view, Data Emission toggle (OFF→ON) |
+| **🚦 Rate Limiting** | Throttle logs per window, Window: 1-60s, Rate: 1-1000 |
+| **🔍 Log Level Filter** | Grep by level (INFO/WARN/ERROR), Keep or Exclude mode |
+| **✂️ Field Removal** | Modify filter, Remove sensitive fields, Comma-separated |
 
 ---
 
