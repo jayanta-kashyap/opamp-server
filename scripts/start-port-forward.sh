@@ -1,12 +1,15 @@
 #!/bin/bash
 
-# Start Port-Forward - Keeps running in background
+# Start Port-Forward - Keeps running in background with auto-restart
 # Usage: ./scripts/start-port-forward.sh
 
 PID_FILE="/tmp/opamp-port-forward.pid"
 LOG_FILE="/tmp/opamp-port-forward.log"
+WRAPPER_SCRIPT="/tmp/opamp-port-forward-wrapper.sh"
 
-# Kill existing port-forward
+echo "🚀 Starting OpAMP port-forward..."
+
+# Kill existing processes
 if [ -f "$PID_FILE" ]; then
     OLD_PID=$(cat "$PID_FILE")
     if kill -0 "$OLD_PID" 2>/dev/null; then
@@ -17,28 +20,46 @@ if [ -f "$PID_FILE" ]; then
     rm -f "$PID_FILE"
 fi
 
-# Kill any process on port 8080
-lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+# Kill any process on port 4321
+lsof -ti:4321 | xargs kill -9 2>/dev/null || true
+pkill -f "opamp-port-forward-wrapper" 2>/dev/null || true
+pkill -f "port-forward.*opamp-server.*4321" 2>/dev/null || true
 
-echo "Starting port-forward (8080:4321)..."
+# Create a wrapper script that auto-restarts port-forward if it dies
+cat > "$WRAPPER_SCRIPT" << 'INNER_EOF'
+#!/bin/bash
+while true; do
+    echo "[$(date)] Starting port-forward..."
+    kubectl port-forward -n opamp-control svc/opamp-server 4321:4321 2>&1
+    echo "[$(date)] Port-forward died, restarting in 2 seconds..."
+    sleep 2
+done
+INNER_EOF
+chmod +x "$WRAPPER_SCRIPT"
 
-# Start port-forward in background with nohup
-nohup kubectl --context control-plane port-forward -n opamp-control svc/opamp-server 8080:4321 > "$LOG_FILE" 2>&1 &
+echo "Starting port-forward with auto-restart (4321:4321)..."
+
+# Start wrapper in background with nohup
+nohup "$WRAPPER_SCRIPT" > "$LOG_FILE" 2>&1 &
 PF_PID=$!
 
 # Save PID
 echo $PF_PID > "$PID_FILE"
 
-sleep 2
+sleep 3
 
-# Verify it's running
-if kill -0 $PF_PID 2>/dev/null; then
+# Verify it's working
+if curl -s http://localhost:4321/api/devices > /dev/null 2>&1; then
+    echo ""
     echo "✅ Port-forward started successfully (PID: $PF_PID)"
-    echo "📊 UI available at: http://localhost:8080"
+    echo "📊 UI available at: http://localhost:4321"
     echo "📝 Logs: tail -f $LOG_FILE"
     echo "🛑 To stop: ./scripts/stop-port-forward.sh"
+    echo ""
+    echo "ℹ️  Port-forward will auto-restart if connection drops"
 else
-    echo "❌ Failed to start port-forward"
-    cat "$LOG_FILE"
-    exit 1
+    echo ""
+    echo "⚠️  Port-forward started but API not responding yet."
+    echo "    Check logs: tail -f $LOG_FILE"
+    echo "    PID: $PF_PID"
 fi

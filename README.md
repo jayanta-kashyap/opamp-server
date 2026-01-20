@@ -9,7 +9,12 @@ Implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs
 - [What This POC Demonstrates](#-what-this-poc-demonstrates)
   - [Architecture Overview](#architecture-overview)
   - [Core Capabilities](#core-capabilities)
-  - [OpAMP Protocol Functions Used](#opamp-protocol-functions-used)
+  - [Data Policies](#data-policies)
+- [Feature Matrix](#-feature-matrix)
+  - [Server Capabilities](#server-capabilities)
+  - [Performance & Scale](#performance--scale)
+  - [API Endpoints](#api-endpoints)
+- [OpAMP Protocol Functions Used](#opamp-protocol-functions-used)
   - [Pod Separation Design in the Edge Device](#pod-separation-design-in-the-edge-device)
 - [Prerequisites](#-prerequisites)
 - [Clone Repositories](#-clone-repositories)
@@ -83,6 +88,47 @@ Each Device:
 ✅ Remote device management via OpAMP  |  ✅ Hot reload (zero downtime)  |  ✅ Auto-registration  
 ✅ Heartbeat tracking (2min timeout)  |  ✅ Runtime monitoring (30s)  |  ✅ Web dashboard  
 ✅ Separate pods (agent + fluentbit)  |  ✅ Shared PVC storage  |  ✅ One-way toggle (OFF→ON)
+
+### Data Policies
+
+| Throttle | Grep | Modify |
+|----------|------|--------|
+| Rate limit logs/window | Filter by log level | Remove fields |
+| Window: 1-60s | Keep/Exclude patterns | Bulk field removal |
+| Print status | Regex matching | Dot-notation support |
+
+---
+
+## 🚀 Feature Matrix
+
+### Server Capabilities
+
+| Protocol | Config | Policies | UI | Architecture |
+|----------|--------|----------|-----|--------------|
+| OpAMP WebSocket | Remote Push | Throttle | Web Dashboard | Pod Separation |
+| gRPC Streams | Hot Reload | Grep Filter | Dual-Panel | Shared PVC |
+| Heartbeat 30s | PVC Persistence | Modify Fields | Emission Toggle | K8s Native |
+| Protobuf | Templates | Policy Builder | Device List | Namespace Isolation |
+
+---
+
+### Performance & Scale
+
+| Max Devices | Config Latency | Hot Reload | Heartbeat | Timeout | Memory/Device |
+|-------------|----------------|------------|-----------|---------|---------------|
+| 100+ | <500ms | ~50ms | 30s | 2min | ~10MB |
+
+---
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Dashboard UI |
+| `GET` | `/api/devices` | List all registered devices with status |
+| `GET` | `/api/devices/{id}/config` | Get current config for a device |
+| `POST` | `/api/devices/config` | Push new config to a device |
+| `POST` | `/api/devices/emission` | Toggle data emission for a device |
 
 ---
 

@@ -8,175 +8,167 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
             min-height: 100vh;
+            color: #333333;
+        }
+        
+        /* Layout */
+        .app-container { display: flex; height: 100vh; }
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 30px;
+        }
+        
+        /* Sidebar Header */
+        .sidebar-header {
             padding: 20px;
-            color: #e0e0e0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
-        .container { max-width: 1600px; margin: 0 auto; }
-        h1 { color: #00d4ff; text-align: center; margin-bottom: 5px; font-size: 1.6em; }
-        .header-subtitle { text-align: center; color: #888; margin-bottom: 15px; font-size: 0.8em; }
-        
-        /* Dynamic Stats Bar */
-        .stats-bar { display: flex; gap: 12px; margin-bottom: 15px; flex-wrap: wrap; }
-        .stat-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 12px 20px;
-            text-align: center;
-            min-width: 120px;
+        .sidebar-header h1 {
+            font-size: 1.3em;
+            color: #333333;
+            margin-bottom: 3px;
         }
-        .stat-card.clickable { cursor: pointer; transition: all 0.2s; }
-        .stat-card.clickable:hover { border-color: rgba(0, 212, 255, 0.5); background: rgba(0, 212, 255, 0.05); }
-        .stat-card.clickable.active { border-color: #00d4ff; background: rgba(0, 212, 255, 0.1); }
-        .stat-value { font-size: 1.5em; font-weight: bold; color: #00d4ff; }
-        .stat-label { font-size: 0.75em; color: #888; margin-top: 3px; }
-        .stat-card.agent-type .stat-value { font-size: 1.3em; }
+        .sidebar-header p { font-size: 0.75em; color: #888; }
         
-        /* Search and Filter Bar */
-        .filter-bar {
+        /* Stats Row */
+        .stats-row {
             display: flex;
             gap: 10px;
-            margin-bottom: 15px;
-            align-items: center;
-            flex-wrap: wrap;
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
-        .search-box {
+        .stat-box {
             flex: 1;
-            min-width: 200px;
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 8px;
+        }
+        .stat-value { font-size: 1.4em; font-weight: 700; color: #333333; }
+        .stat-label { font-size: 0.65em; color: #888; margin-top: 2px; }
+        
+        /* Search */
+        .search-container { padding: 15px 20px; }
+        .search-input {
+            width: 100%;
             padding: 10px 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.15);
             border-radius: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #e0e0e0;
-            font-size: 14px;
-        }
-        .search-box:focus { outline: none; border-color: rgba(0, 212, 255, 0.5); }
-        .filter-btn {
-            padding: 10px 16px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            background: transparent;
-            color: #aaa;
-            cursor: pointer;
+            background: #ffffff;
+            color: #333333;
             font-size: 13px;
-            transition: all 0.2s;
         }
-        .filter-btn:hover { border-color: rgba(0, 212, 255, 0.5); color: #fff; }
-        .filter-btn.active { border-color: #00d4ff; background: rgba(0, 212, 255, 0.1); color: #00d4ff; }
+        .search-input:focus { outline: none; border-color: #666; }
         
-        /* Grid Layout */
-        .grid-layout {
-            display: grid;
-            grid-template-columns: 420px 1fr;
-            gap: 15px;
-            align-items: start;
-        }
-        .card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 15px;
-        }
-        .section-title {
-            font-size: 0.9em;
-            color: #00d4ff;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .device-count { color: #888; font-size: 0.85em; }
-        
-        /* Device List with Virtual Scroll */
-        .device-list-container {
-            max-height: 600px;
+        /* Device List */
+        .device-list {
+            flex: 1;
             overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(0, 212, 255, 0.3) transparent;
+            padding: 0 10px 10px;
         }
-        .device-list-container::-webkit-scrollbar { width: 6px; }
-        .device-list-container::-webkit-scrollbar-track { background: transparent; }
-        .device-list-container::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.3); border-radius: 3px; }
-        .device-list { display: flex; flex-direction: column; gap: 8px; }
+        .device-list::-webkit-scrollbar { width: 6px; }
+        .device-list::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
         
-        /* Compact Device Card */
-        .device-card {
-            padding: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .device-item {
+            padding: 12px 15px;
+            margin: 5px 0;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.15s ease;
-            background: rgba(0, 0, 0, 0.2);
+            transition: all 0.15s;
+            background: #ffffff;
         }
-        .device-card:hover { border-color: rgba(0, 212, 255, 0.4); background: rgba(0, 212, 255, 0.03); }
-        .device-card.selected { border-color: #00d4ff; background: rgba(0, 212, 255, 0.08); }
-        .device-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .device-name { font-weight: 600; color: #fff; font-size: 0.95em; }
-        .agent-badge {
-            font-size: 0.65em;
-            padding: 2px 8px;
+        .device-item:hover { border-color: rgba(0, 0, 0, 0.2); background: #f8f8f8; }
+        .device-item.selected { border-color: #333333; background: #f0f0f0; }
+        .device-item-header { display: flex; justify-content: space-between; align-items: center; }
+        .device-item-name { font-weight: 600; font-size: 0.9em; }
+        .device-item-badge {
+            font-size: 0.6em;
+            padding: 3px 8px;
             border-radius: 10px;
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
             font-weight: 600;
-            text-transform: uppercase;
         }
-        .agent-badge.otelcol { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-        .agent-badge.fluentbit { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; }
-        .agent-badge.vector { background: linear-gradient(135deg, #f093fb, #f5576c); color: white; }
-        .agent-badge.telegraf { background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; }
-        .agent-badge.unknown { background: rgba(150, 150, 150, 0.5); color: white; }
-        .device-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .device-item-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
         .status-dot.online { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
         .status-dot.offline { background: #666; }
-        .meta-tag {
-            font-size: 0.7em;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.08);
-            color: #aaa;
-        }
-        .emission-badge {
-            font-size: 0.65em;
+        .meta-tag { font-size: 0.7em; color: #888; }
+        .emission-tag {
+            font-size: 0.6em;
             padding: 2px 8px;
             border-radius: 10px;
             font-weight: 600;
             margin-left: auto;
         }
-        .emission-badge.on { background: rgba(76, 175, 80, 0.3); color: #81c784; }
-        .emission-badge.off { background: rgba(100, 100, 100, 0.3); color: #999; }
+        .emission-tag.on { background: rgba(76, 175, 80, 0.3); color: #81c784; }
+        .emission-tag.off { background: rgba(100, 100, 100, 0.3); color: #888; }
         
-        /* Config Panel */
-        .config-section { display: none; }
-        .config-section.active { display: block; }
-        .config-header-row {
+        /* Main Content - No Selection */
+        .no-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #555;
+        }
+        .no-selection-icon { font-size: 4em; margin-bottom: 15px; opacity: 0.5; }
+        .no-selection h2 { font-size: 1.2em; color: #888; margin-bottom: 8px; }
+        .no-selection p { font-size: 0.9em; }
+        
+        /* Device Detail View */
+        .device-detail { display: none; }
+        .device-detail.active { display: block; }
+        
+        .detail-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
-        .device-title { display: flex; align-items: center; gap: 10px; }
-        .device-title-name { font-size: 1.1em; font-weight: 600; color: #fff; }
-        .emission-toggle {
+        .detail-title-section { display: flex; align-items: center; gap: 15px; }
+        .detail-title { font-size: 1.5em; font-weight: 600; color: #333; }
+        .detail-badge {
+            font-size: 0.7em;
+            padding: 5px 12px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+            font-weight: 600;
+        }
+        
+        /* Emission Toggle */
+        .emission-control {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 8px 15px;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.3);
+            gap: 15px;
+            padding: 15px 20px;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
         }
-        .emission-label { font-size: 0.8em; color: #888; }
+        .emission-control-label { font-size: 0.85em; color: #666; }
         .toggle-switch {
             position: relative;
-            width: 50px;
-            height: 26px;
-            background: #444;
-            border-radius: 13px;
+            width: 54px;
+            height: 28px;
+            background: #ccc;
+            border-radius: 14px;
             cursor: pointer;
             transition: background 0.2s;
         }
@@ -184,508 +176,1152 @@
         .toggle-switch::after {
             content: '';
             position: absolute;
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
             background: white;
             border-radius: 50%;
             top: 2px;
             left: 2px;
             transition: left 0.2s;
         }
-        .toggle-switch.on::after { left: 26px; }
-        .toggle-switch.disabled { opacity: 0.5; cursor: not-allowed; }
-        .toggle-switch.locked { cursor: not-allowed; position: relative; }
-        .toggle-switch.locked:hover::before {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #00d4ff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            white-space: nowrap;
-            margin-bottom: 8px;
-            z-index: 1000;
-            border: 1px solid rgba(0, 212, 255, 0.3);
+        .toggle-switch.on::after { left: 28px; }
+        .toggle-switch.locked { cursor: not-allowed; opacity: 0.7; }
+        .emission-status {
+            font-size: 0.75em;
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+        .emission-status.active { background: rgba(76, 175, 80, 0.2); color: #81c784; }
+        .emission-status.inactive { background: rgba(100, 100, 100, 0.2); color: #888; }
+        
+        /* Section Headers */
+        .section-header {
+            font-size: 1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-header .section-icon { font-size: 1.1em; }
+        
+        /* Two Column Layout */
+        .dual-panel-container {
+            display: flex;
+            gap: 25px;
+            align-items: stretch;
         }
         
-        .config-label { font-size: 0.85em; color: #aaa; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #e0e0e0;
-            font-size: 12px;
-            font-family: 'Monaco', 'Menlo', monospace;
-            line-height: 1.4;
-            resize: vertical;
+        .panel-left {
+            flex: 0 0 35%;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
         }
-        textarea:focus { outline: none; border-color: rgba(0, 212, 255, 0.5); }
-        .current-config { height: 180px; background: rgba(0, 0, 0, 0.4); }
-        .new-config { height: 160px; }
-        .button-row { display: flex; gap: 10px; margin-top: 12px; }
-        .btn {
-            padding: 10px 18px;
-            border: none;
+        
+        .panel-right {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-card {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-card .policy-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-card .policy-section-wrapper {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        /* Policy Cards */
+        .policy-section { margin-bottom: 25px; }
+        .policy-section-title {
+            font-size: 1em;
+            color: #333333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .policy-section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .policy-card {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        .policy-card:hover { border-color: rgba(0, 0, 0, 0.25); }
+        
+        .policy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .policy-info { flex: 1; }
+        .policy-name { font-size: 1.05em; font-weight: 600; color: #333; margin-bottom: 4px; }
+        .policy-desc { font-size: 0.8em; color: #666; line-height: 1.4; }
+        
+        .policy-toggle {
+            padding: 6px 14px;
+            border: 1px solid rgba(0, 0, 0, 0.3);
             border-radius: 6px;
-            font-size: 13px;
+            background: transparent;
+            color: #333333;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .policy-toggle:hover { background: rgba(0, 0, 0, 0.05); }
+        .policy-toggle.active { 
+            background: #333333; 
+            color: #ffffff;
+            border-color: #333333;
+        }
+        
+        /* Enabled policy card styling */
+        .policy-card.policy-enabled {
+            border-color: #333333;
+            background: #f8f8f8;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Form Controls */
+        .form-group { margin-bottom: 15px; }
+        .form-label {
+            display: block;
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .form-row { display: flex; gap: 15px; }
+        .form-row .form-group { flex: 1; }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            background: #ffffff;
+            color: #333333;
+            font-size: 0.9em;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #666;
+        }
+        .form-select { cursor: pointer; }
+        .form-select option { background: #ffffff; }
+        
+        .form-hint { font-size: 0.7em; color: #666; margin-top: 4px; }
+        
+        /* Checkbox Pills */
+        .checkbox-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+        .checkbox-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.8em;
+        }
+        .checkbox-pill:hover { border-color: rgba(0, 0, 0, 0.3); }
+        .checkbox-pill.selected { border-color: #333333; background: #333333; color: #ffffff; }
+        .checkbox-pill input { display: none; }
+        
+        /* Apply Button */
+        .policy-actions { margin-top: 20px; display: flex; gap: 10px; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
         }
-        .btn-primary { background: linear-gradient(135deg, #00d4ff, #0099cc); color: #000; }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3); }
-        .btn-secondary { background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255, 255, 255, 0.2); }
-        .btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); }
-        .btn-small { padding: 4px 10px; font-size: 0.75em; border: 1px solid rgba(0, 212, 255, 0.3); background: transparent; color: #00d4ff; border-radius: 4px; cursor: pointer; }
-        .btn-small:hover { background: rgba(0, 212, 255, 0.1); }
+        .btn-primary { background: linear-gradient(135deg, #333333, #555555); color: #fff; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+        .btn-secondary { background: rgba(0, 0, 0, 0.08); color: #333; }
+        .btn-secondary:hover:not(:disabled) { background: rgba(0, 0, 0, 0.12); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        .message {
-            padding: 10px 12px;
-            border-radius: 6px;
-            margin-bottom: 12px;
-            display: none;
-            font-size: 0.85em;
+        /* Message Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
         }
-        .message.success { display: block; background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.5); color: #81c784; }
-        .message.error { display: block; background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.5); color: #ef9a9a; }
-        .no-selection { text-align: center; padding: 40px 20px; color: #666; }
-        .no-selection-icon { font-size: 2.5em; margin-bottom: 10px; }
-        .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: rgba(76, 175, 80, 0.95); color: white; }
+        .toast.error { background: rgba(244, 67, 54, 0.95); color: white; }
+        
+        /* Config Preview */
+        .config-preview {
+            background: #f5f5f5;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .config-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .config-preview-title { font-size: 0.8em; color: #666; }
+        .config-preview-code {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75em;
+            line-height: 1.5;
+            color: #555;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* Raw Config Tab */
+        .raw-config-area {
+            width: 100%;
+            height: 180px;
+            padding: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+            background: #ffffff;
+            color: #333333;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8em;
+            line-height: 1.4;
+            resize: vertical;
+        }
+        .raw-config-area:focus { outline: none; border-color: #666; }
+        
+        /* Current Config Display */
+        .current-config-section { margin-bottom: 20px; }
+        .current-config-box {
+            background: #f5f5f5;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75em;
+            line-height: 1.4;
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #555;
+        }
+        
+        /* Loading */
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,0.2); border-top-color: #333; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         
-        /* Bulk Actions */
-        .bulk-actions {
-            display: flex;
-            gap: 8px;
-            padding: 10px;
-            background: rgba(0, 212, 255, 0.05);
-            border-radius: 8px;
-            margin-bottom: 12px;
-            align-items: center;
+        /* Policy Section Container */
+        .policy-container {
+            position: relative;
         }
-        .bulk-actions span { font-size: 0.8em; color: #888; margin-right: auto; }
         
-        @media (max-width: 1000px) {
-            .grid-layout { grid-template-columns: 1fr; }
-            .device-list-container { max-height: 400px; }
+        /* Policy Disabled Overlay - floats over watermarked content */
+        .policy-disabled-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 12px;
+        }
+        .policy-disabled-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .policy-disabled-overlay .overlay-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 25px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.92);
+            border: 2px dashed rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.15);
+        }
+        .policy-disabled-overlay .overlay-icon {
+            font-size: 2.5em;
+            margin-bottom: 12px;
+            opacity: 0.7;
+        }
+        .policy-disabled-overlay .overlay-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        .policy-disabled-overlay .overlay-desc {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 15px;
+            max-width: 350px;
+            line-height: 1.4;
+        }
+        .policy-disabled-overlay .overlay-hint {
+            font-size: 0.75em;
+            color: #888;
+            padding: 8px 15px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 6px;
+        }
+        
+        /* Watermark effect on policy cards when disabled */
+        .policy-section-wrapper {
+            display: block;
+            transition: opacity 0.3s, filter 0.3s;
+        }
+        .policy-section-wrapper.disabled {
+            opacity: 0.55;
+            filter: grayscale(0.3);
+            pointer-events: none;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dual-panel-container { flex-direction: column; }
+            .panel-left, .panel-right { width: 100%; }
+        }
+        @media (max-width: 900px) {
+            .app-container { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; max-height: 50vh; }
+            .main-content { padding: 15px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>OpAMP Device Management</h1>
-        <p class="header-subtitle">Edge Device Configuration & Data Emission Control</p>
-
-        <div class="stats-bar" id="statsBar">
-            <div class="stat-card">
-                <div class="stat-value" id="totalDevices">0</div>
-                <div class="stat-label">Total Devices</div>
+    <div class="app-container">
+        <!-- Sidebar: Device List -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>OpAMP Control</h1>
+                <p>Edge Device Management</p>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="connectedDevices">0</div>
-                <div class="stat-label">Connected</div>
+            
+            <div class="stats-row">
+                <div class="stat-box">
+                    <div class="stat-value" id="totalDevices">0</div>
+                    <div class="stat-label">DEVICES</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="connectedDevices">0</div>
+                    <div class="stat-label">ONLINE</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="emittingDevices">0</div>
+                    <div class="stat-label">EMITTING</div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="emissionOn">0</div>
-                <div class="stat-label">Emission ON</div>
+            
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchBox" placeholder="Search devices..." oninput="filterDevices()">
             </div>
-            <!-- Dynamic agent type cards will be inserted here -->
+            
+            <div class="device-list" id="deviceList">
+                <div style="text-align:center;padding:30px;color:#666;">
+                    <span class="loading"></span>
+                    <p style="margin-top:10px;font-size:0.85em;">Loading devices...</p>
+                </div>
+            </div>
         </div>
-
-        <div class="filter-bar">
-            <input type="text" class="search-box" id="searchBox" placeholder="Search devices by ID, type, pipeline..." oninput="applyFilters()">
-            <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
-            <button class="filter-btn" data-filter="connected" onclick="setFilter('connected')">Connected</button>
-            <button class="filter-btn" data-filter="emission-on" onclick="setFilter('emission-on')">Emission ON</button>
-            <button class="filter-btn" data-filter="emission-off" onclick="setFilter('emission-off')">Emission OFF</button>
-        </div>
-
-        <div class="grid-layout">
-            <div class="card">
-                <div class="section-title">
-                    <span>Edge Devices</span>
-                    <span class="device-count" id="filteredCount">0 devices</span>
-                </div>
-                <div class="bulk-actions" id="bulkActions">
-                    <span>Bulk Actions:</span>
-                    <button class="btn-small" onclick="bulkEmission(true)">Enable All Emission</button>
-                </div>
-                <div class="device-list-container">
-                    <div id="deviceList" class="device-list">
-                        <div class="no-selection"><span class="loading"></span><p style="margin-top:10px">Loading...</p></div>
-                    </div>
-                </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- No Selection State -->
+            <div class="no-selection" id="noSelection">
+                <div class="no-selection-icon">📡</div>
+                <h2>Select a Device</h2>
+                <p>Choose a device from the sidebar to configure data policies</p>
             </div>
-
-            <div class="card">
-                <div id="messageBox" class="message"></div>
-                <div id="noSelection" class="no-selection">
-                    <div class="no-selection-icon">📋</div>
-                    <p>Select a device to view and manage its configuration</p>
-                </div>
-                <div id="configSection" class="config-section">
-                    <div class="config-header-row">
-                        <div class="device-title">
-                            <span class="device-title-name" id="selectedDeviceName"></span>
-                            <span id="selectedAgentBadge" class="agent-badge"></span>
-                        </div>
-                        <div class="emission-toggle">
-                            <span class="emission-label">Data Emission</span>
-                            <div id="emissionSwitch" class="toggle-switch" onclick="toggleSelectedEmission()"></div>
-                        </div>
+            
+            <!-- Device Detail View -->
+            <div class="device-detail" id="deviceDetail">
+                <div class="detail-header">
+                    <div class="detail-title-section">
+                        <span class="detail-title" id="detailDeviceName">-</span>
+                        <span class="detail-badge">Fluent Bit</span>
                     </div>
-
-                    <div style="margin-bottom:12px">
-                        <div class="config-label">
-                            <span>Current Configuration</span>
-                            <button class="btn-small" onclick="refreshConfig()">Refresh</button>
-                        </div>
-                        <textarea id="currentConfig" class="current-config" readonly></textarea>
-                    </div>
-
-                    <div>
-                        <div class="config-label"><span>New Configuration</span></div>
-                        <textarea id="newConfig" class="new-config" placeholder="Enter new configuration..."></textarea>
-                    </div>
-
-                    <div class="button-row">
-                        <button class="btn btn-primary" id="pushBtn" onclick="pushConfig()">Push Configuration</button>
-                        <button class="btn btn-secondary" onclick="loadTemplate()">Load Template</button>
-                        <button class="btn btn-secondary" onclick="copyConfig()">Copy Current</button>
+                    <div class="emission-control">
+                        <span class="emission-control-label">Data Emission</span>
+                        <div class="toggle-switch" id="emissionToggle" onclick="toggleEmission()"></div>
+                        <span class="emission-status" id="emissionStatus">OFF</span>
                     </div>
                 </div>
+                
+                <!-- Two Column Layout: Raw Config (Left) | Data Policies (Right) -->
+                <div class="dual-panel-container">
+                    <!-- LEFT PANEL: Raw Configuration (Always Active) -->
+                    <div class="panel-left">
+                        <div class="panel-card">
+                            <div class="section-header">
+                                <span class="section-icon">📝</span>
+                                <span>Raw Configuration</span>
+                            </div>
+                            
+                            <div class="current-config-section">
+                                <div class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
+                                    <span>Current Device Config (Live)</span>
+                                    <button class="btn btn-secondary" style="padding:4px 10px;font-size:0.75em;" onclick="refreshConfig()">Refresh</button>
+                                </div>
+                                <div class="current-config-box" id="currentConfigBox">Loading...</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Push Custom Configuration</label>
+                                <textarea class="raw-config-area" id="rawConfigArea" placeholder="Paste your Fluent Bit configuration here..."></textarea>
+                            </div>
+                            
+                            <div class="policy-actions">
+                                <button class="btn btn-primary" onclick="pushRawConfig()">Push Config</button>
+                                <button class="btn btn-secondary" onclick="loadDefaultTemplate()">Template</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- RIGHT PANEL: Data Policies -->
+                    <div class="panel-right">
+                        <div class="panel-card">
+                            <div class="section-header">
+                                <span class="section-icon">🎛️</span>
+                                <span>Data Policies</span>
+                            </div>
+                    
+                            <div class="policy-container" id="policyContainer">
+                                <!-- Disabled Overlay - floats over watermarked content -->
+                        <div class="policy-disabled-overlay show" id="policyDisabledOverlay">
+                            <div class="overlay-content">
+                                <div class="overlay-icon">⚡</div>
+                                <div class="overlay-title">Enable Data Emission First</div>
+                                <div class="overlay-desc">Turn on the emission toggle above, or push a configuration below to start emitting data.</div>
+                                <div class="overlay-hint">💡 Push a config below to auto-enable emission</div>
+                            </div>
+                        </div>
+                        
+                        <div class="policy-section-wrapper disabled" id="policySectionWrapper">
+                        <div class="policy-section">
+                            <div class="policy-section-title">Configure Data Control Policies</div>
+                            
+                            <!-- Throttle Policy -->
+                            <div class="policy-card" id="throttleCard">
+                                <div class="policy-header">
+                                    <div class="policy-info">
+                                        <div class="policy-name">🚦 Rate Limiting (Throttle)</div>
+                                        <div class="policy-desc">Limit the number of logs processed per time window to control data volume</div>
+                                    </div>
+                                    <button class="policy-toggle" id="throttleToggle" onclick="togglePolicy('throttle')">Include</button>
+                                </div>
+                                <div class="policy-form" id="throttleForm">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label">Max Logs per Window</label>
+                                            <select class="form-select" id="throttleRate">
+                                                <option value="1">1 log</option>
+                                                <option value="3" selected>3 logs</option>
+                                                <option value="5">5 logs</option>
+                                                <option value="10">10 logs</option>
+                                                <option value="20">20 logs</option>
+                                                <option value="50">50 logs</option>
+                                                <option value="100">100 logs</option>
+                                            </select>
+                                            <div class="form-hint">Maximum logs allowed through per window</div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Time Window (seconds)</label>
+                                            <select class="form-select" id="throttleWindow">
+                                                <option value="1">1 second</option>
+                                                <option value="5" selected>5 seconds</option>
+                                                <option value="10">10 seconds</option>
+                                                <option value="30">30 seconds</option>
+                                                <option value="60">1 minute</option>
+                                            </select>
+                                            <div class="form-hint">Time period for rate calculation</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Grep Policy -->
+                            <div class="policy-card" id="grepCard">
+                                <div class="policy-header">
+                                    <div class="policy-info">
+                                        <div class="policy-name">🔍 Log Level Filter (Grep)</div>
+                                        <div class="policy-desc">Filter logs by severity level - only forward important logs to reduce noise</div>
+                                    </div>
+                                    <button class="policy-toggle" id="grepToggle" onclick="togglePolicy('grep')">Include</button>
+                                </div>
+                                <div class="policy-form" id="grepForm">
+                                    <div class="form-group">
+                                        <label class="form-label">Include Log Levels</label>
+                                        <div class="checkbox-pills" id="logLevelPills">
+                                            <div class="checkbox-pill" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="debug">
+                                                <span>Debug</span>
+                                            </div>
+                                            <div class="checkbox-pill" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="info">
+                                                <span>Info</span>
+                                            </div>
+                                            <div class="checkbox-pill selected" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="warn" checked>
+                                                <span>Warning</span>
+                                            </div>
+                                            <div class="checkbox-pill selected" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="error" checked>
+                                                <span>Error</span>
+                                            </div>
+                                            <div class="checkbox-pill selected" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="fatal" checked>
+                                                <span>Fatal</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-hint">Click to select levels - logs matching ANY selected level will be forwarded</div>
+                                    </div>
+                                    <input type="hidden" id="grepField" value="level">
+                                </div>
+                            </div>
+                            
+                            <!-- Modify Policy -->
+                            <div class="policy-card" id="modifyCard">
+                                <div class="policy-header">
+                                    <div class="policy-info">
+                                        <div class="policy-name">✂️ Field Removal (Modify)</div>
+                                        <div class="policy-desc">Remove sensitive or unnecessary fields from logs before forwarding</div>
+                                    </div>
+                                    <button class="policy-toggle" id="modifyToggle" onclick="togglePolicy('modify')">Include</button>
+                                </div>
+                                <div class="policy-form" id="modifyForm">
+                                    <div class="form-group">
+                                        <label class="form-label">Fields to Remove</label>
+                                        <div class="checkbox-pills" id="removeFieldPills">
+                                            <div class="checkbox-pill selected" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="password" checked>
+                                                <span>password</span>
+                                            </div>
+                                            <div class="checkbox-pill selected" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="secret" checked>
+                                                <span>secret</span>
+                                            </div>
+                                            <div class="checkbox-pill" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="token">
+                                                <span>token</span>
+                                            </div>
+                                            <div class="checkbox-pill" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="api_key">
+                                                <span>api_key</span>
+                                            </div>
+                                            <div class="checkbox-pill" onclick="togglePill(event, this)">
+                                                <input type="checkbox" value="credit_card">
+                                                <span>credit_card</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-hint">Click to select fields to remove from logs</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Custom Fields (comma separated)</label>
+                                        <input type="text" class="form-input" id="customRemoveFields" placeholder="e.g., ssn, private_data, internal_id">
+                                        <div class="form-hint">Additional fields to remove from logs</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Config Preview -->
+                        <div class="config-preview" id="configPreview">
+                            <div class="config-preview-header">
+                                <span class="config-preview-title">Generated Configuration Preview</span>
+                            </div>
+                            <div class="config-preview-code" id="previewCode">Enable policies above to see the generated config...</div>
+                        </div>
+                        
+                        <div class="policy-actions">
+                            <button class="btn btn-primary" id="applyBtn" onclick="applyPolicies()">Apply Policies</button>
+                            <button class="btn btn-secondary" onclick="resetPolicies()">Reset</button>
+                        </div>
+                        </div><!-- end policy-section-wrapper -->
+                    </div><!-- end policy-container -->
+                        </div><!-- end panel-card -->
+                    </div><!-- end panel-right -->
+                </div><!-- end dual-panel-container -->
             </div>
         </div>
     </div>
+    
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
 
     <script>
+        // State
         var state = {
             devices: [],
-            filtered: [],
             selected: null,
-            filter: 'all',
-            search: '',
-            agentTypes: {}
+            policies: {
+                throttle: { enabled: false, rate: 3, window: 5 },
+                grep: { enabled: false, levels: ['warn', 'error', 'fatal'], field: 'level' },
+                modify: { enabled: false, fields: ['password', 'secret'], custom: '' }
+            }
         };
 
+        // ============== Device List ==============
         function fetchDevices() {
             fetch('/api/devices')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
-                    // Server returns sorted by ID, filter valid device IDs
                     state.devices = (data.devices || []).filter(function(d) {
                         return d.id && d.id.match(/^[a-zA-Z0-9-_]+$/);
                     });
                     updateStats();
-                    applyFilters();
+                    renderDeviceList();
                 })
                 .catch(function(e) { console.error('Fetch error:', e); });
         }
 
         function updateStats() {
             var total = state.devices.length;
-            var connected = 0, emissionOn = 0;
-            state.agentTypes = {};
-
+            var connected = 0, emitting = 0;
             state.devices.forEach(function(d) {
                 if (d.connected) connected++;
-                if (d.emission_enabled) emissionOn++;
-                var type = d.agent_type || 'unknown';
-                state.agentTypes[type] = (state.agentTypes[type] || 0) + 1;
+                if (d.emission_enabled) emitting++;
             });
-
             document.getElementById('totalDevices').textContent = total;
             document.getElementById('connectedDevices').textContent = connected;
-            document.getElementById('emissionOn').textContent = emissionOn;
-
-            // Render dynamic agent type cards
-            renderAgentTypeCards();
+            document.getElementById('emittingDevices').textContent = emitting;
         }
 
-        function renderAgentTypeCards() {
-            var bar = document.getElementById('statsBar');
-            // Remove old dynamic cards
-            var oldCards = bar.querySelectorAll('.agent-type-card');
-            oldCards.forEach(function(c) { c.remove(); });
-
-            // Add new cards for each agent type
-            var typeLabels = {
-                'fluentbit': 'Fluent Bit',
-                'unknown': 'Unknown'
-            };
-
-            Object.keys(state.agentTypes).sort().forEach(function(type) {
-                var card = document.createElement('div');
-                card.className = 'stat-card agent-type agent-type-card clickable';
-                card.setAttribute('data-type', type);
-                card.onclick = function() { filterByType(type); };
-                card.innerHTML = '<div class="stat-value">' + state.agentTypes[type] + '</div>' +
-                    '<div class="stat-label">' + (typeLabels[type] || type) + '</div>';
-                bar.appendChild(card);
-            });
+        function filterDevices() {
+            renderDeviceList();
         }
 
-        function filterByType(type) {
-            // Toggle type filter
-            var cards = document.querySelectorAll('.agent-type-card');
-            cards.forEach(function(c) {
-                if (c.getAttribute('data-type') === type) {
-                    c.classList.toggle('active');
-                } else {
-                    c.classList.remove('active');
-                }
-            });
-            applyFilters();
-        }
-
-        function setFilter(f) {
-            state.filter = f;
-            var btns = document.querySelectorAll('.filter-btn');
-            btns.forEach(function(b) {
-                b.classList.toggle('active', b.getAttribute('data-filter') === f);
-            });
-            applyFilters();
-        }
-
-        function applyFilters() {
+        function renderDeviceList() {
             var search = document.getElementById('searchBox').value.toLowerCase();
-            var activeType = null;
-            var activeCard = document.querySelector('.agent-type-card.active');
-            if (activeCard) activeType = activeCard.getAttribute('data-type');
-
-            state.filtered = state.devices.filter(function(d) {
-                // Search filter
-                if (search) {
-                    var match = d.id.toLowerCase().indexOf(search) >= 0 ||
-                        (d.agent_type && d.agent_type.toLowerCase().indexOf(search) >= 0) ||
-                        (d.pipeline && d.pipeline.toLowerCase().indexOf(search) >= 0);
-                    if (!match) return false;
+            var list = document.getElementById('deviceList');
+            var filtered = state.devices.filter(function(d) {
+                if (!search) return true;
+                return d.id.toLowerCase().indexOf(search) >= 0;
+            });
+            
+            // Natural sort: device-1, device-2, ..., device-10 (not device-1, device-10, device-2)
+            filtered.sort(function(a, b) {
+                var regex = /(\d+)/g;
+                var aParts = a.id.split(regex);
+                var bParts = b.id.split(regex);
+                for (var i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+                    var aPart = aParts[i] || '';
+                    var bPart = bParts[i] || '';
+                    var aNum = parseInt(aPart, 10);
+                    var bNum = parseInt(bPart, 10);
+                    if (!isNaN(aNum) && !isNaN(bNum)) {
+                        if (aNum !== bNum) return aNum - bNum;
+                    } else {
+                        if (aPart !== bPart) return aPart.localeCompare(bPart);
+                    }
                 }
-                // Type filter
-                if (activeType && d.agent_type !== activeType) return false;
-                // Status filter
-                if (state.filter === 'connected' && !d.connected) return false;
-                if (state.filter === 'emission-on' && !d.emission_enabled) return false;
-                if (state.filter === 'emission-off' && d.emission_enabled) return false;
-                return true;
+                return 0;
             });
 
-            document.getElementById('filteredCount').textContent = state.filtered.length + ' device' + (state.filtered.length !== 1 ? 's' : '');
-            renderDevices();
-        }
-
-        function renderDevices() {
-            var list = document.getElementById('deviceList');
-            if (state.filtered.length === 0) {
-                list.innerHTML = '<div class="no-selection"><div class="no-selection-icon">📡</div><p>' + 
-                    (state.devices.length === 0 ? 'No devices connected' : 'No devices match filter') + '</p></div>';
+            if (filtered.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:0.85em;">' +
+                    (state.devices.length === 0 ? 'No devices connected' : 'No devices match search') + '</div>';
                 return;
             }
 
             var html = '';
-            state.filtered.forEach(function(d) {
+            filtered.forEach(function(d) {
                 var sel = state.selected === d.id ? 'selected' : '';
-                var agentClass = d.agent_type || 'unknown';
-                var typeLabels = { 'fluentbit': 'FB' };
-                var agentLabel = typeLabels[d.agent_type] || d.agent_type || '?';
-
-                html += '<div class="device-card ' + sel + '" onclick="selectDevice(\'' + d.id + '\')">';
-                html += '<div class="device-header">';
-                html += '<span class="device-name">' + d.id + '</span>';
-                html += '<span class="agent-badge ' + agentClass + '">' + agentLabel + '</span>';
+                html += '<div class="device-item ' + sel + '" onclick="selectDevice(\'' + d.id + '\')">';
+                html += '<div class="device-item-header">';
+                html += '<span class="device-item-name">' + d.id + '</span>';
+                html += '<span class="device-item-badge">FB</span>';
                 html += '</div>';
-                html += '<div class="device-meta">';
+                html += '<div class="device-item-meta">';
                 html += '<span class="status-dot ' + (d.connected ? 'online' : 'offline') + '"></span>';
-                html += '<span class="meta-tag">' + (d.pipeline || '-') + '</span>';
-                html += '<span class="emission-badge ' + (d.emission_enabled ? 'on' : 'off') + '">' + (d.emission_enabled ? 'EMIT' : 'OFF') + '</span>';
+                html += '<span class="meta-tag">' + (d.pipeline || 'default') + '</span>';
+                html += '<span class="emission-tag ' + (d.emission_enabled ? 'on' : 'off') + '">' + 
+                    (d.emission_enabled ? 'EMITTING' : 'OFF') + '</span>';
                 html += '</div></div>';
             });
             list.innerHTML = html;
-
-            // Update selected device emission switch if visible
-            if (state.selected) {
-                var d = state.devices.find(function(x) { return x.id === state.selected; });
-                if (d) updateEmissionSwitch(d.emission_enabled);
-            }
         }
 
         function selectDevice(id) {
             state.selected = id;
-            renderDevices();
+            renderDeviceList();
+            
             document.getElementById('noSelection').style.display = 'none';
-            document.getElementById('configSection').classList.add('active');
+            document.getElementById('deviceDetail').classList.add('active');
+            document.getElementById('detailDeviceName').textContent = id;
             
             var d = state.devices.find(function(x) { return x.id === id; });
-            document.getElementById('selectedDeviceName').textContent = id;
-            var badge = document.getElementById('selectedAgentBadge');
-            var sw = document.getElementById('emissionSwitch');
+            updateEmissionUI(d ? d.emission_enabled : false);
             
-            if (d) {
-                var typeLabels = { 'otelcol': 'OTel Collector', 'fluentbit': 'Fluent Bit', 'vector': 'Vector', 'telegraf': 'Telegraf' };
-                badge.textContent = typeLabels[d.agent_type] || d.agent_type || 'Unknown';
-                badge.className = 'agent-badge ' + (d.agent_type || 'unknown');
-                updateEmissionSwitch(d.emission_enabled);
-                sw.classList.toggle('disabled', !d.connected);
-                // Lock toggle if emission is ON
-                if (d.emission_enabled) {
-                    sw.classList.add('locked');
-                    sw.setAttribute('data-tooltip', 'Cannot turn off emission once started. Use config policies to reduce data.');
-                } else {
-                    sw.classList.remove('locked');
-                    sw.removeAttribute('data-tooltip');
-                }
-            }
+            resetPolicies();
             refreshConfig();
+            updatePreview();
         }
 
-        function updateEmissionSwitch(isOn) {
-            var sw = document.getElementById('emissionSwitch');
-            sw.classList.toggle('on', isOn);
+        // ============== Emission Control ==============
+        function updateEmissionUI(isOn) {
+            var toggle = document.getElementById('emissionToggle');
+            var status = document.getElementById('emissionStatus');
+            toggle.classList.toggle('on', isOn);
+            toggle.classList.toggle('locked', isOn);
+            status.textContent = isOn ? 'ACTIVE' : 'OFF';
+            status.className = 'emission-status ' + (isOn ? 'active' : 'inactive');
+            
+            // Show/hide policy overlay based on emission state
+            var overlay = document.getElementById('policyDisabledOverlay');
+            var wrapper = document.getElementById('policySectionWrapper');
+            if (isOn) {
+                overlay.classList.remove('show');
+                wrapper.classList.remove('disabled');
+            } else {
+                overlay.classList.add('show');
+                wrapper.classList.add('disabled');
+            }
         }
 
-        function toggleSelectedEmission() {
-            if (!state.selected) return;
+        function toggleEmission() {
             var d = state.devices.find(function(x) { return x.id === state.selected; });
             if (!d || !d.connected) return;
-            // Only allow OFF -> ON transition
+            
             if (d.emission_enabled) {
-                showMsg('Cannot turn off emission once started. Use config policies to reduce emission instead.', 'error');
+                showToast('Emission cannot be turned off. Use data policies to control volume.', 'error');
                 return;
             }
-            toggleEmission(d.id, true);
-        }
-
-        function refreshConfig() {
-            if (!state.selected) return;
-            var ta = document.getElementById('currentConfig');
-            ta.value = 'Loading...';
-            fetch('/api/devices/' + state.selected + '/config')
-                .then(function(r) { return r.json(); })
-                .then(function(data) { ta.value = data.config || 'No config available'; })
-                .catch(function(e) { ta.value = 'Error: ' + e.message; });
-        }
-
-        function pushConfig() {
-            var id = state.selected;
-            var cfg = document.getElementById('newConfig').value;
-            if (!id) { showMsg('Select a device first', 'error'); return; }
-            if (!cfg.trim()) { showMsg('Enter a configuration', 'error'); return; }
-            var btn = document.getElementById('pushBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading"></span> Pushing...';
-            fetch('/api/devices/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ deviceId: id, config: cfg })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(res) {
-                if (res.success) {
-                    showMsg('Config pushed to ' + id, 'success');
-                    document.getElementById('newConfig').value = '';
-                    setTimeout(refreshConfig, 500);
-                    setTimeout(fetchDevices, 1000);
-                } else {
-                    showMsg('Failed: ' + (res.error || 'Unknown'), 'error');
-                }
-            })
-            .catch(function(e) { showMsg('Error: ' + e.message, 'error'); })
-            .finally(function() { btn.disabled = false; btn.textContent = 'Push Configuration'; });
-        }
-
-        function toggleEmission(id, turnOn) {
-            var d = state.devices.find(function(x) { return x.id === id; });
-            if (!d) return;
-            // For turning ON, use fluentbitOn() config
-            var cfg = turnOn ? fluentbitOn() : '';
             
+            // Use existing config or generate default if none exists
+            var cfg = d.config || getDefaultBaseConfig();
             fetch('/api/devices/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ deviceId: id, config: cfg, setEmission: turnOn })
+                body: JSON.stringify({ deviceId: state.selected, config: cfg, setEmission: true })
             })
             .then(function(r) { return r.json(); })
             .then(function(res) {
                 if (res.success) {
-                    d.emission_enabled = turnOn;
+                    d.emission_enabled = true;
+                    updateEmissionUI(true);
                     updateStats();
-                    applyFilters();
-                    showMsg('Emission ' + (turnOn ? 'enabled' : 'disabled') + ' for ' + id, 'success');
-                    if (state.selected === id) setTimeout(refreshConfig, 500);
+                    renderDeviceList();
+                    showToast('Data emission enabled for ' + state.selected, 'success');
+                    setTimeout(refreshConfig, 500);
                 } else {
-                    showMsg('Toggle failed: ' + res.error, 'error');
+                    showToast('Failed: ' + res.error, 'error');
                 }
             })
-            .catch(function(e) { showMsg('Error: ' + e.message, 'error'); });
+            .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
         }
 
-        function bulkEmission(turnOn) {
-            // Only allow enabling emission, not disabling
-            if (!turnOn) {
-                showMsg('Cannot disable emission. Use config policies to reduce data.', 'error');
+        // ============== Policy Controls ==============
+        function togglePolicy(policy) {
+            state.policies[policy].enabled = !state.policies[policy].enabled;
+            var btn = document.getElementById(policy + 'Toggle');
+            var card = document.getElementById(policy + 'Card');
+            
+            if (state.policies[policy].enabled) {
+                btn.classList.add('active');
+                btn.textContent = '✓ Included';
+                card.classList.add('policy-enabled');
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = 'Include';
+                card.classList.remove('policy-enabled');
+            }
+            updatePreview();
+        }
+
+        function togglePill(event, el) {
+            event.preventDefault();
+            event.stopPropagation();
+            el.classList.toggle('selected');
+            var cb = el.querySelector('input');
+            cb.checked = el.classList.contains('selected');
+            updatePolicyState();
+            updatePreview();
+        }
+
+        function updatePolicyState() {
+            // Update grep levels
+            var levels = [];
+            document.querySelectorAll('#logLevelPills .checkbox-pill.selected input').forEach(function(cb) {
+                levels.push(cb.value);
+            });
+            state.policies.grep.levels = levels;
+            state.policies.grep.field = document.getElementById('grepField').value;
+
+            // Update modify fields
+            var fields = [];
+            document.querySelectorAll('#removeFieldPills .checkbox-pill.selected input').forEach(function(cb) {
+                fields.push(cb.value);
+            });
+            state.policies.modify.fields = fields;
+            state.policies.modify.custom = document.getElementById('customRemoveFields').value;
+
+            // Update throttle
+            state.policies.throttle.rate = document.getElementById('throttleRate').value;
+            state.policies.throttle.window = document.getElementById('throttleWindow').value;
+        }
+
+        function resetPolicies() {
+            state.policies = {
+                throttle: { enabled: false, rate: 3, window: 5 },
+                grep: { enabled: false, levels: ['warn', 'error', 'fatal'], field: 'level' },
+                modify: { enabled: false, fields: ['password', 'secret'], custom: '' }
+            };
+            
+            ['throttle', 'grep', 'modify'].forEach(function(p) {
+                document.getElementById(p + 'Toggle').classList.remove('active');
+                document.getElementById(p + 'Toggle').textContent = 'Include';
+                document.getElementById(p + 'Card').classList.remove('policy-enabled');
+            });
+            
+            // Reset pills to default
+            document.querySelectorAll('#logLevelPills .checkbox-pill').forEach(function(pill) {
+                var val = pill.querySelector('input').value;
+                var shouldSelect = ['warn', 'error', 'fatal'].indexOf(val) >= 0;
+                pill.classList.toggle('selected', shouldSelect);
+                pill.querySelector('input').checked = shouldSelect;
+            });
+            
+            document.querySelectorAll('#removeFieldPills .checkbox-pill').forEach(function(pill) {
+                var val = pill.querySelector('input').value;
+                var shouldSelect = ['password', 'secret'].indexOf(val) >= 0;
+                pill.classList.toggle('selected', shouldSelect);
+                pill.querySelector('input').checked = shouldSelect;
+            });
+            
+            document.getElementById('customRemoveFields').value = '';
+            document.getElementById('throttleRate').value = '3';
+            document.getElementById('throttleWindow').value = '5';
+            document.getElementById('grepField').value = 'level';
+            
+            updatePreview();
+        }
+
+        // ============== Config Generation ==============
+        // Parse existing config into sections
+        function parseConfig(configStr) {
+            var sections = { service: '', inputs: [], filters: [], outputs: [] };
+            if (!configStr) return sections;
+            
+            var lines = configStr.split('\n');
+            var currentSection = null;
+            var currentContent = '';
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                var sectionMatch = line.match(/^\[(\w+)\]/i);
+                
+                if (sectionMatch) {
+                    // Save previous section
+                    if (currentSection && currentContent.trim()) {
+                        if (currentSection === 'SERVICE') {
+                            sections.service = currentContent;
+                        } else if (currentSection === 'INPUT') {
+                            sections.inputs.push(currentContent);
+                        } else if (currentSection === 'FILTER') {
+                            sections.filters.push(currentContent);
+                        } else if (currentSection === 'OUTPUT') {
+                            sections.outputs.push(currentContent);
+                        }
+                    }
+                    currentSection = sectionMatch[1].toUpperCase();
+                    currentContent = line + '\n';
+                } else if (currentSection) {
+                    currentContent += line + '\n';
+                }
+            }
+            
+            // Save last section
+            if (currentSection && currentContent.trim()) {
+                if (currentSection === 'SERVICE') {
+                    sections.service = currentContent;
+                } else if (currentSection === 'INPUT') {
+                    sections.inputs.push(currentContent);
+                } else if (currentSection === 'FILTER') {
+                    sections.filters.push(currentContent);
+                } else if (currentSection === 'OUTPUT') {
+                    sections.outputs.push(currentContent);
+                }
+            }
+            
+            return sections;
+        }
+        
+        // Get current device config from state
+        function getCurrentDeviceConfig() {
+            var d = state.devices.find(function(x) { return x.id === state.selected; });
+            return d ? d.config : '';
+        }
+        
+        // Generate default base config (only used if device has no config)
+        function getDefaultBaseConfig() {
+            return '[SERVICE]\n' +
+                '    flush        5\n' +
+                '    daemon       Off\n' +
+                '    log_level    info\n' +
+                '    http_server  On\n' +
+                '    http_listen  0.0.0.0\n' +
+                '    http_port    2020\n' +
+                '    hot_reload   On\n\n' +
+                '[INPUT]\n' +
+                '    name         dummy\n' +
+                '    tag          logs\n' +
+                '    dummy        {"message":"sample log","level":"info"}\n' +
+                '    rate         1\n\n' +
+                '[OUTPUT]\n' +
+                '    name         stdout\n' +
+                '    match        *\n' +
+                '    format       json_lines\n';
+        }
+
+        function generateConfig() {
+            updatePolicyState();
+            
+            // Get existing device config or use default
+            var existingConfig = getCurrentDeviceConfig();
+            var baseConfig = existingConfig || getDefaultBaseConfig();
+            var parsed = parseConfig(baseConfig);
+            
+            // Build new config preserving SERVICE, INPUT, OUTPUT
+            var cfg = '';
+            
+            // Add SERVICE section (preserved from device)
+            if (parsed.service) {
+                cfg += parsed.service + '\n';
+            }
+            
+            // Add INPUT sections (preserved from device)
+            parsed.inputs.forEach(function(input) {
+                cfg += input + '\n';
+            });
+            
+            // Add new FILTER sections based on policies (replacing old filters)
+            if (state.policies.throttle.enabled) {
+                cfg += '[FILTER]\n' +
+                    '    name         throttle\n' +
+                    '    match        *\n' +
+                    '    rate         ' + state.policies.throttle.rate + '\n' +
+                    '    window       ' + state.policies.throttle.window + '\n' +
+                    '    print_status true\n\n';
+            }
+            
+            if (state.policies.grep.enabled && state.policies.grep.levels.length > 0) {
+                var pattern = state.policies.grep.levels.join('|');
+                cfg += '[FILTER]\n' +
+                    '    name         grep\n' +
+                    '    match        *\n' +
+                    '    regex        ' + state.policies.grep.field + ' (' + pattern + ')\n\n';
+            }
+            
+            if (state.policies.modify.enabled) {
+                var allFields = state.policies.modify.fields.slice();
+                if (state.policies.modify.custom) {
+                    state.policies.modify.custom.split(',').forEach(function(f) {
+                        var trimmed = f.trim();
+                        if (trimmed) allFields.push(trimmed);
+                    });
+                }
+                if (allFields.length > 0) {
+                    cfg += '[FILTER]\n' +
+                        '    name         modify\n' +
+                        '    match        *\n';
+                    allFields.forEach(function(f) {
+                        cfg += '    remove       ' + f + '\n';
+                    });
+                    cfg += '\n';
+                }
+            }
+            
+            // Add OUTPUT sections (preserved from device)
+            parsed.outputs.forEach(function(output) {
+                cfg += output;
+            });
+            
+            return cfg.trim();
+        }
+
+        function updatePreview() {
+            var preview = document.getElementById('previewCode');
+            var hasPolicy = state.policies.throttle.enabled || 
+                           state.policies.grep.enabled || 
+                           state.policies.modify.enabled;
+            
+            if (!hasPolicy) {
+                preview.textContent = 'Enable policies above to see the generated config...';
+            } else {
+                preview.textContent = generateConfig();
+            }
+        }
+
+        // ============== Apply Policies ==============
+        function applyPolicies() {
+            if (!state.selected) {
+                showToast('No device selected', 'error');
                 return;
             }
-            var targets = state.filtered.filter(function(d) { return d.connected && !d.emission_enabled; });
-            if (targets.length === 0) { showMsg('No devices to enable', 'error'); return; }
             
-            var completed = 0;
-            targets.forEach(function(d) {
-                var cfg = fluentbitOn();
-                fetch('/api/devices/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ deviceId: d.id, config: cfg, setEmission: true })
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(res) {
-                    if (res.success) d.emission_enabled = true;
-                    completed++;
-                    if (completed === targets.length) {
-                        updateStats();
-                        applyFilters();
-                        showMsg('Enabled emission for ' + completed + ' devices', 'success');
-                    }
-                });
+            var cfg = generateConfig();
+            var btn = document.getElementById('applyBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Applying...';
+            
+            fetch('/api/devices/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceId: state.selected, config: cfg })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    showToast('Policies applied to ' + state.selected, 'success');
+                    setTimeout(refreshConfig, 500);
+                } else {
+                    showToast('Failed: ' + (res.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(function(e) { showToast('Error: ' + e.message, 'error'); })
+            .finally(function() {
+                btn.disabled = false;
+                btn.textContent = 'Apply Policies';
             });
         }
 
-        function fluentbitOn() {
-            return '[SERVICE]\n    flush        5\n    daemon       Off\n    log_level    info\n    http_server  On\n    http_listen  0.0.0.0\n    http_port    2020\n    hot_reload   On\n\n[INPUT]\n    name         dummy\n    tag          logs\n    dummy        {"message":"test log","level":"info"}\n    rate         1\n\n[OUTPUT]\n    name         stdout\n    match        *\n    format       json_lines';
+        // ============== Raw Config ==============
+        function refreshConfig() {
+            if (!state.selected) return;
+            var box = document.getElementById('currentConfigBox');
+            box.textContent = 'Loading...';
+            
+            fetch('/api/devices/' + state.selected + '/config')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    box.textContent = data.config || 'No configuration available';
+                })
+                .catch(function(e) {
+                    box.textContent = 'Error loading config: ' + e.message;
+                });
         }
 
-        function loadTemplate() {
+        function pushRawConfig() {
+            if (!state.selected) {
+                showToast('No device selected', 'error');
+                return;
+            }
+            
+            var cfg = document.getElementById('rawConfigArea').value;
+            if (!cfg.trim()) {
+                showToast('Enter a configuration', 'error');
+                return;
+            }
+            
+            // Auto-enable emission when pushing raw config
+            fetch('/api/devices/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deviceId: state.selected, config: cfg, setEmission: true })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    // Update local state and UI to reflect emission is now ON
+                    var d = state.devices.find(function(x) { return x.id === state.selected; });
+                    if (d) {
+                        d.emission_enabled = true;
+                    }
+                    updateEmissionUI(true);
+                    updateStats();
+                    renderDeviceList();
+                    
+                    showToast('Configuration pushed & emission enabled for ' + state.selected, 'success');
+                    document.getElementById('rawConfigArea').value = '';
+                    setTimeout(refreshConfig, 500);
+                } else {
+                    showToast('Failed: ' + (res.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+        }
+
+        function loadDefaultTemplate() {
+            // Load current device config or default template
             var d = state.devices.find(function(x) { return x.id === state.selected; });
-            if (!d) return;
-            document.getElementById('newConfig').value = fluentbitOn();
-            showMsg('Template loaded', 'success');
-        }
-
-        function copyConfig() {
-            var cur = document.getElementById('currentConfig').value;
-            if (cur && cur !== 'Loading...' && cur.indexOf('Error') !== 0) {
-                document.getElementById('newConfig').value = cur;
-                showMsg('Config copied', 'success');
+            if (d && d.config) {
+                document.getElementById('rawConfigArea').value = d.config;
+                showToast('Current config loaded', 'success');
+            } else {
+                document.getElementById('rawConfigArea').value = getDefaultBaseConfig();
+                showToast('Default template loaded', 'success');
             }
         }
 
-        var msgTimer;
-        function showMsg(msg, type) {
-            var box = document.getElementById('messageBox');
-            clearTimeout(msgTimer);
-            box.textContent = msg;
-            box.className = 'message ' + type;
-            msgTimer = setTimeout(function() { box.className = 'message'; }, 4000);
+        // ============== Toast ==============
+        var toastTimer;
+        function showToast(msg, type) {
+            var toast = document.getElementById('toast');
+            clearTimeout(toastTimer);
+            toast.textContent = msg;
+            toast.className = 'toast ' + type + ' show';
+            toastTimer = setTimeout(function() {
+                toast.classList.remove('show');
+            }, 4000);
         }
 
+        // ============== Event Listeners ==============
+        document.getElementById('throttleRate').addEventListener('change', function() { updatePolicyState(); updatePreview(); });
+        document.getElementById('throttleWindow').addEventListener('change', function() { updatePolicyState(); updatePreview(); });
+        document.getElementById('grepField').addEventListener('change', function() { updatePolicyState(); updatePreview(); });
+        document.getElementById('customRemoveFields').addEventListener('input', function() { updatePolicyState(); updatePreview(); });
+
+        // ============== Init ==============
         fetchDevices();
-        setInterval(fetchDevices, 5000); // Longer interval for scale
+        setInterval(fetchDevices, 5000);
     </script>
 </body>
 </html>

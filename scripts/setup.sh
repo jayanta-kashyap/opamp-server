@@ -1,17 +1,21 @@
 #!/bin/bash
 
 # OpAMP POC - Complete Setup Script
-# Usage: ./scripts/setup.sh
+# Usage: ./scripts/setup.sh [number-of-devices]
+# Example: ./scripts/setup.sh 20
 # 
 # This script sets up the entire OpAMP POC from scratch:
 # 1. Starts minikube (if not running)
 # 2. Creates namespaces
 # 3. Builds all Docker images
 # 4. Deploys cloud components (server + supervisor)
-# 5. Deploys 2 edge devices (device-3, device-4)
+# 5. Deploys N edge devices (default: 5)
 # 6. Starts port-forward for UI access
 
 set -e
+
+# Number of devices to deploy (default: 5)
+DEVICE_COUNT=${1:-5}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$(dirname "$SCRIPT_DIR")"
@@ -26,6 +30,9 @@ EDGE_NS="opamp-edge"
 echo "=============================================="
 echo "  OpAMP POC - Complete Setup"
 echo "=============================================="
+echo ""
+echo "Configuration:"
+echo "  Devices to deploy: $DEVICE_COUNT"
 echo ""
 echo "Directories:"
 echo "  Server:       $SERVER_DIR"
@@ -109,23 +116,22 @@ deploy_cloud() {
     echo "✅ Cloud components deployed"
 }
 
-# Deploy edge devices using add-device.sh
+# Deploy edge devices using batch script
 deploy_devices() {
     echo ""
-    echo "📱 Deploying edge devices..."
+    echo "📱 Deploying $DEVICE_COUNT edge devices..."
     
     cd "$DEVICE_AGENT_DIR"
     
-    echo "Deploying device-1..."
-    ./scripts/add-device.sh 1
+    # Make sure batch script is executable
+    chmod +x ./scripts/add-devices-batch.sh
     
-    echo ""
-    echo "Deploying device-2..."
-    ./scripts/add-device.sh 2
+    # Deploy N devices in one batch (device-1 through device-N)
+    ./scripts/add-devices-batch.sh 1 $DEVICE_COUNT
     
     cd "$SERVER_DIR"
     
-    echo "✅ Edge devices deployed"
+    echo "✅ All $DEVICE_COUNT edge devices deployed"
 }
 
 # Start port-forward
@@ -155,13 +161,15 @@ show_status() {
     echo "  Access"
     echo "=============================================="
     echo ""
-    echo "🌐 Web UI: http://localhost:8080"
+    echo "🌐 Web UI: http://localhost:4321"
     echo ""
     echo "📝 Useful commands:"
     echo "   View logs:     kubectl --context $CONTEXT logs -n opamp-control -l app=opamp-server -f"
     echo "   Add device:    cd $DEVICE_AGENT_DIR && ./scripts/add-device.sh <number>"
     echo "   Remove device: cd $DEVICE_AGENT_DIR && ./scripts/remove-device.sh <number>"
     echo "   Stop port-forward: $SCRIPT_DIR/stop-port-forward.sh"
+    echo ""
+    echo "ℹ️  Port-forward auto-restarts if connection drops"
     echo ""
 }
 
