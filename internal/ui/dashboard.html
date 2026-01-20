@@ -638,9 +638,9 @@
                         <div class="policy-disabled-overlay show" id="policyDisabledOverlay">
                             <div class="overlay-content">
                                 <div class="overlay-icon">⚡</div>
-                                <div class="overlay-title">Enable Data Emission First</div>
-                                <div class="overlay-desc">Turn on the emission toggle above, or push a configuration below to start emitting data.</div>
-                                <div class="overlay-hint">💡 Push a config below to auto-enable emission</div>
+                                <div class="overlay-title">Data Emission is OFF</div>
+                                <div class="overlay-desc">Turn on the emission toggle above to start emitting data and configure policies.</div>
+                                <div class="overlay-hint">💡 Toggle ON above or push a config to auto-enable</div>
                             </div>
                         </div>
                         
@@ -930,32 +930,44 @@
             var d = state.devices.find(function(x) { return x.id === state.selected; });
             if (!d || !d.connected) return;
             
-            if (d.emission_enabled) {
-                showToast('Emission cannot be turned off. Use data policies to control volume.', 'error');
-                return;
+            var newState = !d.emission_enabled;
+            var action = newState ? 'enable' : 'disable';
+            
+            // Confirm before disabling
+            if (!newState) {
+                if (!confirm('Turn OFF data emission for ' + state.selected + '?\n\nThis will stop all data output from this device.')) {
+                    return;
+                }
             }
             
-            // Use existing config or generate default if none exists
-            var cfg = d.config || getDefaultBaseConfig();
+            // Toggle switch visual immediately for responsiveness
+            var toggle = document.getElementById('emissionToggle');
+            toggle.classList.add('locked');
+            
             fetch('/api/devices/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ deviceId: state.selected, config: cfg, setEmission: true })
+                body: JSON.stringify({ deviceId: state.selected, setEmission: newState })
             })
             .then(function(r) { return r.json(); })
             .then(function(res) {
+                toggle.classList.remove('locked');
                 if (res.success) {
-                    d.emission_enabled = true;
-                    updateEmissionUI(true);
+                    d.emission_enabled = newState;
+                    updateEmissionUI(newState);
                     updateStats();
                     renderDeviceList();
-                    showToast('Data emission enabled for ' + state.selected, 'success');
+                    var msg = newState ? 'Data emission ENABLED' : 'Data emission DISABLED (stopped)';
+                    showToast(msg + ' for ' + state.selected, newState ? 'success' : 'info');
                     setTimeout(refreshConfig, 500);
                 } else {
                     showToast('Failed: ' + res.error, 'error');
                 }
             })
-            .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+            .catch(function(e) { 
+                toggle.classList.remove('locked');
+                showToast('Error: ' + e.message, 'error'); 
+            });
         }
 
         // ============== Policy Controls ==============

@@ -87,7 +87,7 @@ Each Device:
 |----------|----------|
 | **Device Management** | Auto-registration, Heartbeat (2min timeout), Runtime monitoring (30s) |
 | **Configuration** | Remote config push, Hot reload (zero downtime), PVC persistence |
-| **Dashboard** | Device list, Dual-panel view, Data Emission toggle (OFF→ON) |
+| **Dashboard** | Device list, Dual-panel view, Data Emission toggle (ON↔OFF) |
 | **Rate Limiting** | Throttle logs per window, Window: 1-60s, Rate: 1-1000 |
 | **Log Level Filter** | Grep by level (INFO/WARN/ERROR), Keep or Exclude mode |
 | **Field Removal** | Modify filter, Remove sensitive fields, Comma-separated |
@@ -320,17 +320,23 @@ Expected output:
 }
 ```
 
-### Enable Data Emission via UI
+### Toggle Data Emission via UI
 1. Open http://localhost:8080
 2. Click toggle for a device
-3. Toggle switches to ON (locked)
-4. Device starts emitting logs
+3. **Toggle ON** → Device starts emitting logs
+4. **Toggle OFF** → Device stops emitting (silent config pushed)
 
-### Enable Data Emission via API
+### Toggle Data Emission via API
 ```bash
+# Enable emission
 curl -X POST http://localhost:8080/api/devices/config \
   -H "Content-Type: application/json" \
-  -d '{"devices": ["device-1"], "setEmission": true}'
+  -d '{"deviceId": "device-1", "setEmission": true}'
+
+# Disable emission
+curl -X POST http://localhost:8080/api/devices/config \
+  -H "Content-Type: application/json" \
+  -d '{"deviceId": "device-1", "setEmission": false}'
 ```
 
 ### Verify Logs Flowing
@@ -453,7 +459,7 @@ minikube delete -p control-plane
 5. Device appears in UI (connected, emission OFF)
          │
          ▼
-6. User clicks toggle to enable emission
+6. User clicks toggle to enable/disable emission
          │
          ▼
 7. Server → Supervisor → Device-Agent (config push)
@@ -478,15 +484,16 @@ minikube delete -p control-plane
 - If no message for **2 minutes** → device marked disconnected
 - Disconnected devices removed from UI automatically
 
-### One-Way Toggle Design
+### Bi-directional Toggle Design
 
-**Why can't you turn OFF emission?**
+**How does ON/OFF work?**
 
-Fluent Bit's hot reload doesn't cleanly support disabling all inputs/outputs. Instead of risking broken configs, the design is:
+Fluent Bit's hot reload supports dynamic config changes without restart:
 
-- **OFF → ON**: Allowed (adds config)
-- **ON → OFF**: Blocked (prevents issues)
-- **Policy**: Reduce data volume, don't stop collection
+- **Toggle ON**: Pushes config with `[INPUT]` + `[OUTPUT]` → Data flows
+- **Toggle OFF**: Pushes silent config (only `[SERVICE]`) → Data stops
+- **Hot Reload**: Both directions work via Fluent Bit's `/api/v2/reload` API
+- **Zero Downtime**: No pod restarts required
 
 ---
 

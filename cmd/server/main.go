@@ -471,6 +471,18 @@ func getDefaultConfig(deviceID string) string {
     format       json_lines`
 }
 
+// getSilentConfig returns a config with no INPUT/OUTPUT - stops all data emission
+func getSilentConfig() string {
+	return `[SERVICE]
+    flush        5
+    daemon       Off
+    log_level    info
+    http_server  On
+    http_listen  0.0.0.0
+    http_port    2020
+    hot_reload   On`
+}
+
 func getDeviceMetadata(deviceID string) (agentType, pipeline string) {
 	// All devices are Fluent Bit with logs pipeline
 	return "fluentbit", "logs"
@@ -734,10 +746,16 @@ func main() {
 			deviceID = req.AgentID
 		}
 
-		// If setEmission is true but no config provided, use default config
+		// Handle emission toggle with config
 		config := req.Config
-		if req.SetEmission != nil && *req.SetEmission && config == "" {
-			config = getDefaultConfig(deviceID)
+		if req.SetEmission != nil {
+			if *req.SetEmission && config == "" {
+				// Enable emission: use default config with INPUT/OUTPUT
+				config = getDefaultConfig(deviceID)
+			} else if !*req.SetEmission {
+				// Disable emission: use silent config (no INPUT/OUTPUT)
+				config = getSilentConfig()
+			}
 		}
 
 		if err := opampServer.PushConfig(deviceID, config); err != nil {
@@ -749,21 +767,9 @@ func main() {
 			return
 		}
 
-		// Update emission state if specified - ONLY allow enabling, not disabling
+		// Update emission state if specified - allow both enabling and disabling
 		if req.SetEmission != nil {
-			if *req.SetEmission {
-				// Allow enabling emission
-				opampServer.SetDeviceEmission(deviceID, true)
-			} else {
-				// Reject disabling emission
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   "Cannot disable emission once started. Use config policies to reduce data emission.",
-				})
-				return
-			}
+			opampServer.SetDeviceEmission(deviceID, *req.SetEmission)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
