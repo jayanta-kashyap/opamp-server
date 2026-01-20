@@ -88,9 +88,9 @@ Each Device:
 | **Device Management** | Auto-registration, Heartbeat (2min timeout), Runtime monitoring (30s) |
 | **Configuration** | Remote config push, Hot reload (zero downtime), PVC persistence |
 | **Dashboard** | Device list, Dual-panel view, Data Emission toggle (OFF→ON) |
-| **🚦 Rate Limiting** | Throttle logs per window, Window: 1-60s, Rate: 1-1000 |
-| **🔍 Log Level Filter** | Grep by level (INFO/WARN/ERROR), Keep or Exclude mode |
-| **✂️ Field Removal** | Modify filter, Remove sensitive fields, Comma-separated |
+| ** Rate Limiting** | Throttle logs per window, Window: 1-60s, Rate: 1-1000 |
+| ** Log Level Filter** | Grep by level (INFO/WARN/ERROR), Keep or Exclude mode |
+| ** Field Removal** | Modify filter, Remove sensitive fields, Comma-separated |
 
 ---
 
