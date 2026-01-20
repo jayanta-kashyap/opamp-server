@@ -1,6 +1,6 @@
 # OpAMP POC - Remote Edge Device Management
 
-Complete implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs/specs/opamp/) for remotely managing Fluent Bit log collectors on edge devices.
+Implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs/specs/opamp/) for remotely managing Fluent Bit log collectors on edge devices.
 
 ---
 
