@@ -52,7 +52,7 @@ Implementation of OpenTelemetry's [OpAMP protocol](https://opentelemetry.io/docs
 │           │ HTTP                           │ gRPC              │
 │           ▼                                │ (per device)      │
 │     User Browser                           │                   │
-│   localhost:8080                           │                   │
+│   localhost:4321                           │                   │
 └────────────────────────────────────────────┼───────────────────┘
                                              │
                     ┌────────────────────────┼────────────────────┐
@@ -270,7 +270,7 @@ This script automatically:
 5. ✅ Deploys 2 edge devices (device-1, device-2)
 6. ✅ Starts port-forward for UI access
 
-After setup, access the UI at: **http://localhost:8080**
+After setup, access the UI at: **http://localhost:4321**
 
 ### Teardown
 ```bash
@@ -345,7 +345,7 @@ cd ../opamp-server
 
 ### 7. Access UI
 ```bash
-open http://localhost:8080
+open http://localhost:4321
 ```
 
 </details>
