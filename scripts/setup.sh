@@ -14,8 +14,8 @@
 
 set -e
 
-# Number of devices to deploy (default: 5)
-DEVICE_COUNT=${1:-5}
+# Number of devices to deploy (default: 1)
+DEVICE_COUNT=${1:-1}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$(dirname "$SCRIPT_DIR")"
