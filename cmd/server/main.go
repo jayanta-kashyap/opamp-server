@@ -451,7 +451,8 @@ func (s *OpAMPServer) PushConfig(deviceID, config string) error {
 }
 
 func getDefaultConfig(deviceID string) string {
-	// Default config emits dummy logs to stdout (emission ON)
+	// Default config emits varied dummy logs to stdout (emission ON)
+	// Multiple INPUT sections generate different log levels and keywords for policy testing
 	return `[SERVICE]
     flush        5
     daemon       Off
@@ -463,8 +464,38 @@ func getDefaultConfig(deviceID string) string {
 
 [INPUT]
     name         dummy
-    tag          poc.logs
-    dummy        {"message":"POC test log","level":"info","device":"` + deviceID + `"}
+    tag          poc.info
+    dummy        {"level":"info","event":"user_login","user_id":"user123","message":"User successfully authenticated","device":"` + deviceID + `"}
+    rate         1
+
+[INPUT]
+    name         dummy
+    tag          poc.info
+    dummy        {"level":"info","event":"payment_processed","amount":99.99,"currency":"USD","message":"Payment completed successfully","device":"` + deviceID + `"}
+    rate         1
+
+[INPUT]
+    name         dummy
+    tag          poc.warn
+    dummy        {"level":"warn","event":"high_cpu","cpu_percent":85,"message":"CPU usage above threshold","device":"` + deviceID + `"}
+    rate         1
+
+[INPUT]
+    name         dummy
+    tag          poc.error
+    dummy        {"level":"error","event":"connection_failed","service":"database","message":"Failed to connect to database server","device":"` + deviceID + `"}
+    rate         1
+
+[INPUT]
+    name         dummy
+    tag          poc.debug
+    dummy        {"level":"debug","event":"cache_hit","key":"session_abc","message":"Cache lookup successful","device":"` + deviceID + `"}
+    rate         1
+
+[INPUT]
+    name         dummy
+    tag          poc.info
+    dummy        {"level":"info","event":"api_request","method":"GET","path":"/api/v1/users","status":200,"message":"API request completed","device":"` + deviceID + `"}
     rate         1
 
 [OUTPUT]
