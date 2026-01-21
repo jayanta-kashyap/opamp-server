@@ -93,7 +93,7 @@ build_images() {
     docker build -t opamp-supervisor:v10 "$SUPERVISOR_DIR" -q
     
     echo "Building opamp-device-agent..."
-    docker build -t opamp-device-agent:v8 "$DEVICE_AGENT_DIR" -q
+    docker build -t opamp-device-agent:v1 "$DEVICE_AGENT_DIR" -q
     
     echo "Building poc-provisioner..."
     docker build -t poc-provisioner:v1 "$DEVICE_AGENT_DIR/poc-provisioner" -q
