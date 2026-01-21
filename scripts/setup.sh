@@ -95,6 +95,9 @@ build_images() {
     echo "Building opamp-device-agent..."
     docker build -t opamp-device-agent:v8 "$DEVICE_AGENT_DIR" -q
     
+    echo "Building poc-provisioner..."
+    docker build -t poc-provisioner:v1 "$DEVICE_AGENT_DIR/poc-provisioner" -q
+    
     echo "✅ All images built"
 }
 
@@ -109,9 +112,12 @@ deploy_cloud() {
     echo "Deploying OpAMP Supervisor..."
     kubectl --context $CONTEXT apply -f "$SUPERVISOR_DIR/k8s/supervisor.yaml"
     
+    echo "Deploying POC Provisioner..."
+    kubectl --context $CONTEXT apply -f "$DEVICE_AGENT_DIR/poc-provisioner/k8s/poc-provisioner.yaml"
+    
     echo "Waiting for cloud components to be ready..."
     kubectl --context $CONTEXT wait --for=condition=available --timeout=120s \
-        deployment/opamp-server deployment/opamp-supervisor -n $CONTROL_NS
+        deployment/opamp-server deployment/opamp-supervisor deployment/poc-provisioner -n $CONTROL_NS
     
     echo "✅ Cloud components deployed"
 }

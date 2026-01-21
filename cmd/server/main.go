@@ -451,7 +451,7 @@ func (s *OpAMPServer) PushConfig(deviceID, config string) error {
 }
 
 func getDefaultConfig(deviceID string) string {
-	// Simple default config for Fluent Bit only
+	// Default config emits dummy logs to stdout (emission ON)
 	return `[SERVICE]
     flush        5
     daemon       Off
@@ -463,17 +463,19 @@ func getDefaultConfig(deviceID string) string {
 
 [INPUT]
     name         dummy
-    tag          logs
-    dummy        {"message":"test log","level":"info"}
+    tag          poc.logs
+    dummy        {"message":"POC test log","level":"info","device":"` + deviceID + `"}
     rate         1
 
 [OUTPUT]
     name         stdout
     match        *
-    format       json_lines`
+    format       json_lines
+`
 }
 
-// getSilentConfig returns a config with no INPUT/OUTPUT - stops all data emission
+// getSilentConfig returns SERVICE-only config (no INPUT/OUTPUT)
+// Note: Toggle OFF is disabled in POC - requires custom FluentBit with policy_type support
 func getSilentConfig() string {
 	return `[SERVICE]
     flush        5
@@ -492,8 +494,8 @@ func getDeviceMetadata(deviceID string) (agentType, pipeline string) {
 
 // parsePipelinesFromConfig extracts pipeline names from Fluent Bit config
 func parsePipelinesFromConfig(config string) string {
-	// For Fluent Bit configs, always return logs
-	if strings.Contains(config, "[SERVICE]") || strings.Contains(config, "[INPUT]") {
+	// For Fluent Bit configs (both INI and YAML), return logs
+	if strings.Contains(config, "service:") || strings.Contains(config, "[SERVICE]") || strings.Contains(config, "pipeline:") {
 		return "logs"
 	}
 	return "unknown"
@@ -501,8 +503,11 @@ func parsePipelinesFromConfig(config string) string {
 
 // detectAgentTypeFromConfig determines agent type from config format
 func detectAgentTypeFromConfig(config string) string {
-	// Fluent Bit uses INI-style config with [SECTIONS]
+	// Fluent Bit uses INI-style or YAML config
 	if strings.Contains(config, "[SERVICE]") || strings.Contains(config, "[INPUT]") || strings.Contains(config, "[OUTPUT]") {
+		return "fluentbit"
+	}
+	if strings.Contains(config, "service:") || strings.Contains(config, "pipeline:") {
 		return "fluentbit"
 	}
 	return "unknown"
@@ -510,7 +515,14 @@ func detectAgentTypeFromConfig(config string) string {
 
 // detectEmissionFromConfig determines if data emission is enabled based on config content
 func detectEmissionFromConfig(config string) bool {
-	// For Fluent Bit: check if there's an [OUTPUT] section that's not null
+	// For YAML format: check policy_type
+	if strings.Contains(config, "policy_type: allow_all") {
+		return true
+	}
+	if strings.Contains(config, "policy_type: block_all") {
+		return false
+	}
+	// For INI format: check if there's an [OUTPUT] section that's not null
 	if strings.Contains(config, "[OUTPUT]") {
 		// Check if output is explicitly set to null
 		lines := strings.Split(config, "\n")
