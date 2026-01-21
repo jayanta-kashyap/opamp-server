@@ -453,56 +453,56 @@ func (s *OpAMPServer) PushConfig(deviceID, config string) error {
 func getDefaultConfig(deviceID string) string {
 	// Default config emits varied dummy logs to stdout (emission ON)
 	// Multiple INPUT sections generate different log levels and keywords for policy testing
-	return `[SERVICE]
-    flush        5
-    daemon       Off
-    log_level    info
-    http_server  On
-    http_listen  0.0.0.0
-    http_port    2020
-    hot_reload   On
-
-[INPUT]
-    name         dummy
-    tag          poc.info
-    dummy        {"level":"info","event":"user_login","user_id":"user123","message":"User successfully authenticated","device":"` + deviceID + `"}
-    rate         1
-
-[INPUT]
-    name         dummy
-    tag          poc.info
-    dummy        {"level":"info","event":"payment_processed","amount":99.99,"currency":"USD","message":"Payment completed successfully","device":"` + deviceID + `"}
-    rate         1
-
-[INPUT]
-    name         dummy
-    tag          poc.warn
-    dummy        {"level":"warn","event":"high_cpu","cpu_percent":85,"message":"CPU usage above threshold","device":"` + deviceID + `"}
-    rate         1
-
-[INPUT]
-    name         dummy
-    tag          poc.error
-    dummy        {"level":"error","event":"connection_failed","service":"database","message":"Failed to connect to database server","device":"` + deviceID + `"}
-    rate         1
-
-[INPUT]
-    name         dummy
-    tag          poc.debug
-    dummy        {"level":"debug","event":"cache_hit","key":"session_abc","message":"Cache lookup successful","device":"` + deviceID + `"}
-    rate         1
-
-[INPUT]
-    name         dummy
-    tag          poc.info
-    dummy        {"level":"info","event":"api_request","method":"GET","path":"/api/v1/users","status":200,"message":"API request completed","device":"` + deviceID + `"}
-    rate         1
-
-[OUTPUT]
-    name         stdout
-    match        *
-    format       json_lines
-`
+	// Note: FluentBit dummy plugin requires JSON in single quotes to avoid config parsing issues
+	return "[SERVICE]\n" +
+		"    flush        5\n" +
+		"    daemon       Off\n" +
+		"    log_level    info\n" +
+		"    http_server  On\n" +
+		"    http_listen  0.0.0.0\n" +
+		"    http_port    2020\n" +
+		"    hot_reload   On\n" +
+		"\n" +
+		"[INPUT]\n" +
+		"    name         dummy\n" +
+		"    tag          poc.info\n" +
+		"    dummy        {\"level\":\"info\",\"event\":\"user_login\",\"user_id\":\"user123\",\"message\":\"User authenticated\",\"device\":\"" + deviceID + "\"}\n" +
+		"    rate         1\n" +
+		"\n" +
+		"[INPUT]\n" +
+		"    name         dummy\n" +
+		"    tag          poc.info\n" +
+		"    dummy        {\"level\":\"info\",\"event\":\"payment_processed\",\"amount\":99.99,\"message\":\"Payment completed\",\"device\":\"" + deviceID + "\"}\n" +
+		"    rate         1\n" +
+		"\n" +
+		"[INPUT]\n" +
+		"    name         dummy\n" +
+		"    tag          poc.warn\n" +
+		"    dummy        {\"level\":\"warn\",\"event\":\"high_cpu\",\"cpu_percent\":85,\"message\":\"CPU usage high\",\"device\":\"" + deviceID + "\"}\n" +
+		"    rate         1\n" +
+		"\n" +
+		"[INPUT]\n" +
+		"    name         dummy\n" +
+		"    tag          poc.error\n" +
+		"    dummy        {\"level\":\"error\",\"event\":\"connection_failed\",\"service\":\"database\",\"message\":\"Database connection failed\",\"device\":\"" + deviceID + "\"}\n" +
+		"    rate         1\n" +
+		"\n" +
+		"[INPUT]\n" +
+		"    name         dummy\n" +
+		"    tag          poc.debug\n" +
+		"    dummy        {\"level\":\"debug\",\"event\":\"cache_hit\",\"key\":\"session_abc\",\"message\":\"Cache lookup success\",\"device\":\"" + deviceID + "\"}\n" +
+		"    rate         1\n" +
+		"\n" +
+		"[INPUT]\n" +
+		"    name         dummy\n" +
+		"    tag          poc.info\n" +
+		"    dummy        {\"level\":\"info\",\"event\":\"api_request\",\"method\":\"GET\",\"path\":\"/api/users\",\"message\":\"API request done\",\"device\":\"" + deviceID + "\"}\n" +
+		"    rate         1\n" +
+		"\n" +
+		"[OUTPUT]\n" +
+		"    name         stdout\n" +
+		"    match        *\n" +
+		"    format       json_lines\n"
 }
 
 // getSilentConfig returns SERVICE-only config (no INPUT/OUTPUT)

@@ -1212,8 +1212,9 @@
             return d ? d.config : '';
         }
         
-        // Generate default base config (only used if device has no config)
+        // Generate default base config with varied log levels for testing policies
         function getDefaultBaseConfig() {
+            var deviceId = state.selected || 'device-1';
             return '[SERVICE]\n' +
                 '    flush        5\n' +
                 '    daemon       Off\n' +
@@ -1224,8 +1225,33 @@
                 '    hot_reload   On\n\n' +
                 '[INPUT]\n' +
                 '    name         dummy\n' +
-                '    tag          logs\n' +
-                '    dummy        {"message":"sample log","level":"info"}\n' +
+                '    tag          poc.info\n' +
+                '    dummy        {"level":"info","event":"user_login","user_id":"user123","message":"User authenticated","device":"' + deviceId + '"}\n' +
+                '    rate         1\n\n' +
+                '[INPUT]\n' +
+                '    name         dummy\n' +
+                '    tag          poc.info\n' +
+                '    dummy        {"level":"info","event":"payment_processed","amount":99.99,"message":"Payment completed","device":"' + deviceId + '"}\n' +
+                '    rate         1\n\n' +
+                '[INPUT]\n' +
+                '    name         dummy\n' +
+                '    tag          poc.warn\n' +
+                '    dummy        {"level":"warn","event":"high_cpu","cpu_percent":85,"message":"CPU usage high","device":"' + deviceId + '"}\n' +
+                '    rate         1\n\n' +
+                '[INPUT]\n' +
+                '    name         dummy\n' +
+                '    tag          poc.error\n' +
+                '    dummy        {"level":"error","event":"connection_failed","service":"database","message":"Database connection failed","device":"' + deviceId + '"}\n' +
+                '    rate         1\n\n' +
+                '[INPUT]\n' +
+                '    name         dummy\n' +
+                '    tag          poc.debug\n' +
+                '    dummy        {"level":"debug","event":"cache_hit","key":"session_abc","message":"Cache lookup success","device":"' + deviceId + '"}\n' +
+                '    rate         1\n\n' +
+                '[INPUT]\n' +
+                '    name         dummy\n' +
+                '    tag          poc.info\n' +
+                '    dummy        {"level":"info","event":"api_request","method":"GET","path":"/api/users","message":"API request done","device":"' + deviceId + '"}\n' +
                 '    rate         1\n\n' +
                 '[OUTPUT]\n' +
                 '    name         stdout\n' +
