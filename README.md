@@ -93,7 +93,7 @@ Each Device:
 | **Device Management** | Auto-registration, Heartbeat (2min timeout), Runtime monitoring (30s) |
 | **Configuration** | Remote config push, Hot reload (zero downtime), PVC persistence |
 | **Dashboard** | Device list, Dual-panel view, Real-time config display, Per-device delete buttons |
-| **Emission Toggle** | Bi-directional ON↔OFF toggle, New devices start with emission OFF |
+| **Emission Toggle** | Toggle ON enabled, Toggle OFF disabled in POC (requires custom FluentBit) |
 | **Policy-Based Config** | Throttle, Grep (log level filter), Modify (field removal), Live preview |
 | **Custom Config Push** | Raw FluentBit config push with pre-populated template |
 | **POC Provisioner** | UI-based device deploy/remove (no kubectl needed) |
@@ -153,9 +153,17 @@ When a device is selected:
 
 #### Emission Behavior
 - **New devices** start with emission **OFF** (silent config)
-- **Toggle ON** → Pushes full config with INPUT/OUTPUT sections
-- **Toggle OFF** → Pushes silent config (SERVICE section only)
+- **Toggle ON** → Pushes full config with INPUT/OUTPUT sections → ✅ Works
+- **Toggle OFF** → Disabled in POC (see limitation below)
 - **Push Custom Config** → Auto-enables emission
+
+#### ⚠️ POC Limitation: Toggle OFF
+
+Toggle OFF is **disabled** in this POC. The stock FluentBit image does not support `policy_type: block_all/allow_all` which is required for proper emission control.
+
+**Why?** FluentBit's HTTP hot reload API hangs when transitioning from a config WITH plugins to a config WITHOUT plugins. In production, custom FluentBit images with `out_aruba_local` plugin and `policy_type` support enable seamless ON↔OFF toggling.
+
+**Workaround for testing:** Remove and redeploy the device to reset it to OFF state.
 
 ---
 
@@ -399,21 +407,20 @@ Expected output:
 1. Open http://localhost:4321
 2. Select a device from the sidebar
 3. Click the **Data Emission** toggle
-4. **Toggle ON** → Device starts emitting logs
-5. **Toggle OFF** → Device stops emitting (silent config pushed)
+4. **Toggle ON** → Device starts emitting logs ✅
+5. **Toggle OFF** → Shows POC limitation toast (disabled in POC)
+
+> **Note:** To reset a device to OFF state, use the 🗑️ button to remove it, then redeploy via "➕ Deploy Test Device".
 
 ### Toggle Data Emission via API
 ```bash
-# Enable emission
+# Enable emission (works)
 curl -X POST http://localhost:4321/api/devices/config \
   -H "Content-Type: application/json" \
   -d '{"deviceId": "device-1", "setEmission": true}'
-
-# Disable emission
-curl -X POST http://localhost:4321/api/devices/config \
-  -H "Content-Type: application/json" \
-  -d '{"deviceId": "device-1", "setEmission": false}'
 ```
+
+> **Note:** `setEmission: false` is disabled in POC. See [POC Limitation](#️-poc-limitation-toggle-off) for details.
 
 ### Verify Logs Flowing
 ```bash
@@ -560,16 +567,38 @@ minikube delete -p control-plane
 - If no message for **2 minutes** → device marked disconnected
 - Disconnected devices removed from UI automatically
 
-### Bi-directional Toggle Design
+### Emission Toggle Design
 
-**How does ON/OFF work?**
+**How does ON work?**
 
 Fluent Bit's hot reload supports dynamic config changes without restart:
 
-- **Toggle ON**: Pushes config with `[INPUT]` + `[OUTPUT]` → Data flows
-- **Toggle OFF**: Pushes silent config (only `[SERVICE]`) → Data stops
-- **Hot Reload**: Both directions work via Fluent Bit's `/api/v2/reload` API
+- **Toggle ON**: Pushes config with `[INPUT]` + `[OUTPUT]` → Data flows ✅
+- **Hot Reload**: Works via Fluent Bit's `/api/v2/reload` API
 - **Zero Downtime**: No pod restarts required
+
+**Why is Toggle OFF disabled in POC?**
+
+| Issue | Description |
+|-------|-------------|
+| HTTP Reload Hang | FluentBit HTTP reload API hangs when transitioning FROM config WITH plugins TO config WITHOUT plugins |
+| SIGHUP Works | SIGHUP signal works reliably but requires shared process namespace (not standard K8s) |
+| Production Solution | Custom FluentBit with `policy_type: block_all/allow_all` support enables seamless toggling |
+
+**Production Architecture:**
+```
+# Emission ON (allow_all)
+[OUTPUT]
+    name         out_aruba_local
+    policy_type  allow_all
+
+# Emission OFF (block_all) 
+[OUTPUT]
+    name         out_aruba_local
+    policy_type  block_all
+```
+
+This maintains the same plugin structure, allowing hot reload to work in both directions.
 
 ---
 
