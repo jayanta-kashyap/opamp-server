@@ -803,7 +803,7 @@ POST /api/bulk/toggle
 - [ ] Runbook and documentation
 - [ ] Security audit
 
-## Phase 5: Scale to 1M (Ongoing)
+## Phase 5: Scale to 1M
 - [ ] Gradual rollout to production devices
 - [ ] Performance tuning
 - [ ] Capacity expansion as needed
