@@ -741,7 +741,7 @@ For 1M devices:
 - [x] Hot reload with FluentBit API
 - [x] Dashboard with toggle controls
 
-## Phase 2: Add Shared State (2-3 weeks)
+## Phase 2: Add Shared State
 - [x] Redis/Elasticache *(already available in CNX cluster)*
 - [x] Kafka *(already available in CNX cluster)*
 - [ ] Migrate device registry to Redis
@@ -749,13 +749,13 @@ For 1M devices:
 - [ ] Add Kafka consumer to Supervisor
 - [ ] Add OTel instrumentation (no stdout, export to DDS)
 
-## Phase 3: Multi-Pod Deployment (2-3 weeks)
+## Phase 3: Multi-Pod Deployment
 - [ ] Scale Server to 3 replicas
 - [ ] Scale Supervisor to 5 replicas
 - [ ] Test failover scenarios
 - [ ] Load test with 1000 devices
 
-## Phase 4: Production Hardening (4-6 weeks)
+## Phase 4: Production Hardening
 - [ ] Add authentication/authorization
 - [ ] Implement rate limiting
 - [ ] Add comprehensive monitoring (DDS dashboards)
