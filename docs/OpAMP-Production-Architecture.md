@@ -1,4 +1,3 @@
-~# OpAMP Production Architecture
 ## Scalable Device Configuration Management for 1M+ Devices
 
 ---
@@ -164,7 +163,7 @@ How does Pod 1 know this? → Needs shared state
 **Scaling:**
 - 3-10 pods behind load balancer
 - Horizontally scalable
-- No local state (reads from PostgreSQL)
+- No local state (reads from Redis)
 
 ```go
 // Pseudo-code: Handle toggle command
@@ -428,36 +427,21 @@ After analyzing the available infrastructure in Aruba, we recommend using **only
 | Config cache | On change | Not critical | Key-value |
 | Command delivery | Every action | < 100ms | Pub/sub |
 
-### Why Redis (Not CockroachDB, ArangoDB, or ClickHouse)
+### Why Redis?
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    Database Selection Analysis                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  OpAMP Core Question: "Which supervisor has device-5?"                  │
-│                                                                         │
-│  ┌─────────────────┐                                                    │
-│  │      Redis      │  GET device:device-5:supervisor                    │
-│  │    0.5 ms ✅    │  → "supervisor-pod-3"                              │
-│  └─────────────────┘                                                    │
-│                                                                         │
-│  ┌─────────────────┐                                                    │
-│  │  CockroachDB    │  SELECT supervisor_id FROM devices                 │
-│  │   5-10 ms ❌    │  WHERE device_id = 'device-5'                       │
-│  └─────────────────┘  (10-20x slower, unnecessary SQL overhead)         │
-│                                                                         │
-│  ┌─────────────────┐                                                    │
-│  │    ArangoDB     │  Graph traversal not needed                        │
-│  │  Wrong tool ❌  │  We don't query "devices 3 hops from device-5"    │
-│  └─────────────────┘                                                    │
-│                                                                         │
-│  ┌─────────────────┐                                                    │
-│  │   ClickHouse    │  OLAP for analytics, not lookups                   │
-│  │  Wrong tool ❌  │  We don't query "avg latency by region"           │
-│  └─────────────────┘                                                    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+OpAMP Core Question: "Which supervisor has device-5?"
+
+┌─────────────────┐
+│      Redis      │  GET device:device-5:supervisor
+│    0.5 ms ✅    │  → "supervisor-pod-3"
+└─────────────────┘
+
+✅ Sub-millisecond lookups (critical for 1M+ devices)
+✅ Built-in TTL (auto-cleanup when devices disconnect)
+✅ Simple key-value model (exactly what we need)
+✅ Already available in Aruba (Elasticache)
+✅ Trivial memory footprint (~200MB for 1M devices)
 ```
 
 ### Redis Data Model (Complete)
@@ -489,26 +473,14 @@ SET config:fluentbit:v1.2.3 "<config data>"
 | Tight coupling | Loose coupling |
 | No audit trail | Kafka retention = command history |
 
-### What About the Other Aruba Databases?
+### Summary: What OpAMP Uses
 
-| Database | Available? | Use for OpAMP? | Reason |
-|----------|------------|----------------|--------|
-| **Redis/Elasticache** | ✅ Yes | ✅ **YES** | Sub-ms lookups, perfect fit |
-| **Kafka** | ✅ Yes | ✅ **YES** | Command delivery, durability |
-| **CockroachDB** | ✅ Yes | ❌ No | SQL overhead not needed, slower lookups |
-| **ArangoDB** | ✅ Yes | ❌ No | Graph queries not needed for OpAMP |
-| **ClickHouse** | ✅ Yes | ❌ No | OLAP/analytics, wrong tool for lookups |
+| Component | Purpose |
+|-----------|--------|
+| **Redis/Elasticache** | Device→Supervisor routing, status cache, config templates |
+| **Kafka** | Command delivery, durability, audit trail |
 
-### Future Use (If Needed)
-
-The other databases can be added later for **non-OpAMP** purposes:
-
-```
-Phase 1 (OpAMP MVP):     Redis + Kafka only
-Phase 2 (If needed):     + CockroachDB for audit logs with SQL queries
-Phase 3 (Analytics):     + ClickHouse for historical reporting
-Future:                  + ArangoDB if network topology queries needed
-```
+> **Note:** Other Aruba databases (CockroachDB, ArangoDB, ClickHouse) are not needed for OpAMP core functionality. They can be added later if analytics or audit log queries are required.
 
 ## Existing Infrastructure Leverage
 
@@ -580,15 +552,15 @@ Each Supervisor Pod:
     └── Config pushes, heartbeats
 ```
 
-## PostgreSQL Sizing
+## Redis Sizing
 
 ```
 For 1M devices:
-├── Rows in device_registry: 1M
-├── Row size: ~200 bytes
-├── Total: ~200 MB (fits in memory)
-├── Indexes: ~100 MB
-└── Total with configs: ~1-2 GB
+├── Keys: ~3M (device routing + status + configs)
+├── Average value size: ~50 bytes
+├── Total memory: ~150-200 MB
+├── Elasticache node: cache.r6g.large (plenty of headroom)
+└── Replication: 1 primary + 1 replica for HA
 ```
 
 ---
@@ -602,8 +574,8 @@ For 1M devices:
 - [x] Dashboard with toggle controls
 
 ## Phase 2: Add Shared State (2-3 weeks)
-- [ ] Add PostgreSQL to cluster
-- [ ] Migrate device registry to DB
+- [ ] Add Redis/Elasticache to cluster
+- [ ] Migrate device registry to Redis
 - [ ] Add Kafka producer to Server
 - [ ] Add Kafka consumer to Supervisor
 
@@ -635,10 +607,10 @@ For 1M devices:
 |---------|--------------|
 | **High Availability** | Multiple Server & Supervisor pods |
 | **Horizontal Scale** | Stateless servers, partitioned supervisors |
-| **Durability** | PostgreSQL for state, Kafka for commands |
-| **Low Latency** | gRPC streaming, Kafka pub/sub |
-| **Auditability** | All commands logged to PostgreSQL |
-| **Operational Simplicity** | Uses existing Kafka infrastructure |
+| **Durability** | Redis for state, Kafka for commands |
+| **Low Latency** | gRPC streaming, Redis lookups (0.5ms) |
+| **Auditability** | All commands logged to Kafka (retention) |
+| **Operational Simplicity** | Uses existing Redis + Kafka infrastructure |
 
 ## Key Metrics to Monitor
 
