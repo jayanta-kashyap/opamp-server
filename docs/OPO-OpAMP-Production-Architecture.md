@@ -6,110 +6,33 @@
 
 | Section | Description |
 |---------|-------------|
-| [1. Current POC Architecture](#1-current-poc-architecture) | Single-instance design in minikube |
-| [2. Production Challenges](#2-production-challenges) | Why POC won't scale |
-| [3. Proposed Production Architecture](#3-proposed-production-architecture) | High-level overview with Redis + Kafka |
-| [4. Component Deep Dive](#4-component-deep-dive) | Server, Supervisor, Redis, Kafka details |
-| [5. Data Flow Patterns](#5-data-flow-patterns) | Registration, commands, hot reload, DDS |
-| [6. Technology Choices](#6-technology-choices) | Redis + Kafka recommendation |
-| [7. Scaling Strategy](#7-scaling-strategy) | Capacity planning and sizing |
-| [8. UI at Scale](#8-ui-at-scale) | Dashboard design for 1M devices |
-| [9. Implementation Roadmap](#9-implementation-roadmap) | Phased rollout plan |
+| [1. Production Architecture](#1-production-architecture) | High-level overview with Redis + Kafka |
+| [2. Component Deep Dive](#2-component-deep-dive) | Server, Supervisor, Redis, Kafka details |
+| [3. Data Flow Patterns](#3-data-flow-patterns) | Registration, commands, hot reload, DDS |
+| [4. Technology Choices](#4-technology-choices) | Redis + Kafka recommendation |
+| [5. Scaling Strategy](#5-scaling-strategy) | Capacity planning and sizing |
+| [6. UI at Scale](#6-ui-at-scale) | Dashboard design for 1M devices |
+| [7. Implementation Roadmap](#7-implementation-roadmap) | Phased rollout plan |
 
 **Quick Links:**
-- [4.1 OpAMP Server](#41-opamp-server-stateless-api-layer) | [4.2 Supervisor Fleet](#42-supervisor-fleet-connection-managers) | [4.3 Redis](#43-rediselasticache-state-storage) | [4.4 Kafka](#44-kafka-message-bus)
-- [5.1 Device Registration](#51-device-registration-flow) | [5.2 Command Flow](#52-command-flow-toggle-emission) | [5.3 Hot Reload](#53-hot-reload-flow-unchanged-from-poc) | [5.4 DDS Observability](#54-cloud-service-observability-serversupervisor--dds)
+- [2.1 OpAMP Server](#21-opamp-server-stateless-api-layer) | [2.2 Supervisor Fleet](#22-supervisor-fleet-connection-managers) | [2.3 Redis](#23-rediselasticache-state-storage) | [2.4 Kafka](#24-kafka-message-bus)
+- [3.1 Device Registration](#31-device-registration-flow) | [3.2 Command Flow](#32-command-flow-toggle-emission) | [3.3 Hot Reload](#33-hot-reload-flow-unchanged-from-poc) | [3.4 DDS Observability](#34-cloud-service-observability-serversupervisor--dds)
 
 ---
 
 # Agenda
 
-1. Current POC Architecture
-2. Production Challenges
-3. Proposed Production Architecture
-4. Component Deep Dive
-5. Data Flow Patterns
-6. Technology Choices
-7. Scaling Strategy
-8. Implementation Roadmap
+1. Production Architecture
+2. Component Deep Dive
+3. Data Flow Patterns
+4. Technology Choices
+5. Scaling Strategy
+6. UI at Scale
+7. Implementation Roadmap
 
 ---
 
-# 1. Current POC Architecture
-
-## Single-Instance Design
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Minikube Cluster                         │
-├─────────────────────────────────────────────────────────────┤
-│  opamp-control namespace                                    │
-│  ┌────────────┐   OpAMP    ┌─────────────┐                 │
-│  │   Server   │◄──────────►│ Supervisor  │                 │
-│  │  (1 pod)   │  WebSocket │  (1 pod)    │                 │
-│  │            │            │             │                 │
-│  │ • REST API │            │ • gRPC      │                 │
-│  │ • Dashboard│            │ • In-memory │                 │
-│  │ • In-memory│            │   device map│                 │
-│  └────────────┘            └──────┬──────┘                 │
-│                                   │                         │
-├───────────────────────────────────┼─────────────────────────┤
-│  opamp-edge namespace             │ gRPC (50051)            │
-│                                   ▼                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ Device      │  │ Device      │  │ Device      │         │
-│  │ Agent 1     │  │ Agent 2     │  │ Agent N     │         │
-│  │ + FluentBit │  │ + FluentBit │  │ + FluentBit │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## POC Characteristics
-
-| Aspect | Current State |
-|--------|---------------|
-| **Devices** | 1 device |
-| **Server Pods** | 1 |
-| **Supervisor Pods** | 1 |
-| **State Storage** | In-memory |
-| **Message Passing** | Direct WebSocket |
-
-✅ **Works perfectly for POC and demo**
-
----
-
-# 2. Production Challenges
-
-## Why POC Architecture Won't Scale
-
-### Problem 1: Single Point of Failure
-```
-Server Pod crashes → All UI/API gone
-Supervisor Pod crashes → All 1M device connections lost
-```
-
-### Problem 2: Memory Limits
-```
-1M devices × 1KB state each = 1GB+ memory per pod
-Single pod can't hold this
-```
-
-### Problem 3: Connection Limits
-```
-Each supervisor pod can handle ~20,000 gRPC connections
-1M devices ÷ 20K = 50 supervisor pods minimum
-```
-
-### Problem 4: Stateless Scaling
-```
-Pod 1 receives "toggle device-5"
-But device-5 is connected to Pod 37
-How does Pod 1 know this? → Needs shared state
-```
-
----
-
-# 3. Proposed Production Architecture
+# 1. Production Architecture
 
 ## High-Level Overview
 
@@ -158,9 +81,9 @@ How does Pod 1 know this? → Needs shared state
 
 ---
 
-# 4. Component Deep Dive
+# 2. Component Deep Dive
 
-## 4.1 OpAMP Server (Stateless API Layer)
+## 2.1 OpAMP Server (Stateless API Layer)
 
 **Responsibilities:**
 - REST API endpoints
@@ -190,7 +113,7 @@ func HandleToggle(deviceID string, state bool) {
 
 ---
 
-## 4.2 Supervisor Fleet (Connection Managers)
+## 2.2 Supervisor Fleet (Connection Managers)
 
 **Responsibilities:**
 - Maintain gRPC streams to devices
@@ -223,7 +146,7 @@ func StartSupervisor(supervisorID string) {
 
 ---
 
-## 4.3 Redis/Elasticache (State Storage)
+## 2.3 Redis/Elasticache (State Storage)
 
 **The Only Database OpAMP Needs**
 
@@ -301,7 +224,7 @@ Recommended: cache.r6g.large (13 GB) for headroom and replication.
 
 ---
 
-## 4.4 Kafka (Message Bus)
+## 2.4 Kafka (Message Bus)
 
 **Topics:**
 
@@ -320,9 +243,9 @@ Recommended: cache.r6g.large (13 GB) for headroom and replication.
 
 ---
 
-# 5. Data Flow Patterns
+# 3. Data Flow Patterns
 
-## 5.1 Device Registration Flow
+## 3.1 Device Registration Flow
 
 ```
 ┌────────────┐     ┌─────────────┐     ┌────────────┐
@@ -345,7 +268,7 @@ Recommended: cache.r6g.large (13 GB) for headroom and replication.
 
 ---
 
-## 5.2 Command Flow (Toggle Emission)
+## 3.2 Command Flow (Toggle Emission)
 
 ```
 ┌──────┐    ┌────────┐    ┌──────────┐    ┌───────┐    ┌────────────┐    ┌────────┐
@@ -391,7 +314,7 @@ Recommended: cache.r6g.large (13 GB) for headroom and replication.
 
 ---
 
-## 5.3 Hot Reload Flow (Unchanged from POC)
+## 3.3 Hot Reload Flow (Unchanged from POC)
 
 ```
 Device Agent                     FluentBit Container
@@ -420,7 +343,7 @@ Device Agent                     FluentBit Container
 
 ---
 
-## 5.4 Cloud Service Observability (Server/Supervisor → DDS)
+## 3.4 Cloud Service Observability (Server/Supervisor → DDS)
 
 **Note:** This section describes observability for the OpAMP cloud services themselves (Server and Supervisor). This is separate from the edge device telemetry pipeline described in Section 5.3.
 
@@ -571,7 +494,7 @@ func HandleToggle(ctx context.Context, deviceID string) {
 
 ---
 
-# 6. Technology Choices
+# 4. Technology Choices
 
 ## Recommendation: Redis + Kafka
 
@@ -697,7 +620,7 @@ That's it. Keep it simple.
 
 ---
 
-# 7. Scaling Strategy
+# 5. Scaling Strategy
 
 ## Capacity Planning
 
@@ -734,7 +657,7 @@ For 1M devices:
 
 ---
 
-# 8. UI at Scale
+# 6. UI at Scale
 
 ## The Challenge
 
@@ -851,7 +774,7 @@ POST /api/bulk/toggle
 
 ---
 
-# 9. Implementation Roadmap
+# 7. Implementation Roadmap
 
 ## Phase 1: POC Enhancement (Current)
 - [x] Single server, single supervisor
