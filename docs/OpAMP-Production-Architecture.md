@@ -13,7 +13,8 @@
 | [5. Data Flow Patterns](#5-data-flow-patterns) | Registration, commands, hot reload, DDS |
 | [6. Technology Choices](#6-technology-choices) | Redis + Kafka recommendation |
 | [7. Scaling Strategy](#7-scaling-strategy) | Capacity planning and sizing |
-| [8. Implementation Roadmap](#8-implementation-roadmap) | Phased rollout plan |
+| [8. UI at Scale](#8-ui-at-scale) | Dashboard design for 1M devices |
+| [9. Implementation Roadmap](#9-implementation-roadmap) | Phased rollout plan |
 
 **Quick Links:**
 - [4.1 OpAMP Server](#41-opamp-server-stateless-api-layer) | [4.2 Supervisor Fleet](#42-supervisor-fleet-connection-managers) | [4.3 Redis](#43-rediselasticache-state-storage) | [4.4 Kafka](#44-kafka-message-bus)
@@ -733,7 +734,124 @@ For 1M devices:
 
 ---
 
-# 8. Implementation Roadmap
+# 8. UI at Scale
+
+## The Challenge
+
+The current POC dashboard loads all devices on page load. This won't work at 1M scale:
+
+```
+POC Dashboard:
+├── Fetches ALL devices on page load
+├── Renders each device as DOM element
+├── Browser memory: 100 devices = OK, 1M devices = 💥 crash
+└── User experience: No one scrolls through 1M rows
+```
+
+## Production UI Strategy
+
+At 1M scale, **no one manages devices one-by-one**. The UI shifts to aggregated views + search + bulk operations:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    OPO Dashboard (Production)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  📊 Overview Dashboard (Default View)                           │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────┐ │
+│  │ 1,000,000   │ │   998,500   │ │    1,500    │ │   12      │ │
+│  │ Total       │ │ Online      │ │ Offline     │ │ Errors    │ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └───────────┘ │
+│                                                                 │
+│  📈 Emission Status                                             │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ ████████████████████░░░░  850K logs ON, 150K logs OFF    │  │
+│  │ ██████████████░░░░░░░░░░  600K metrics ON, 400K OFF      │  │
+│  │ ██░░░░░░░░░░░░░░░░░░░░░░  100K traces ON, 900K OFF       │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  🔍 Search / Filter                                             │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ [device-id contains: _____] [status: ▼] [type: ▼]       │  │
+│  │ [region: ▼] [config version: ▼] [emission: ▼]           │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  📋 Results (paginated, 50 per page)                           │
+│  ┌────────────────────────────────────────────────────────────┐│
+│  │ ☐ device-abc-001  │ Online │ v1.2.3 │ Logs: ON │ Region: A ││
+│  │ ☐ device-abc-002  │ Online │ v1.2.3 │ Logs: ON │ Region: A ││
+│  │ ☐ device-xyz-100  │ Offline│ v1.2.1 │ Logs: OFF│ Region: B ││
+│  └────────────────────────────────────────────────────────────┘│
+│  [< Prev] Page 1 of 20,000 [Next >]                            │
+│                                                                 │
+│  ⚡ Bulk Actions (applied to filtered results)                  │
+│  [Toggle Logs ON] [Toggle Logs OFF] [Push Config v1.2.4]       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Key Design Principles
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Never load all devices** | Server-side pagination (50 per page) |
+| **Aggregated stats** | Redis `SCARD`, pre-computed metrics |
+| **Search/Filter** | Server-side query, return page of results |
+| **Bulk operations** | "Apply to filter" not "select checkboxes" |
+| **Async processing** | Bulk ops queued via Kafka, show progress |
+
+## API Design for Scale
+
+```go
+// POC (won't scale)
+GET /api/devices → returns ALL devices ❌
+
+// Production (paginated + filtered)
+GET /api/devices?page=1&limit=50&status=online&region=US → returns 50 devices ✅
+
+// Aggregations (for dashboard widgets)
+GET /api/stats → { total: 1000000, online: 998500, offline: 1500, ... }
+
+// Bulk operations (by filter, not by ID list)
+POST /api/bulk/toggle
+{
+  "filter": { "region": "US", "status": "online" },
+  "action": "enable_logs"
+}
+→ { "queued": true, "affected": 250000, "job_id": "abc123" }
+```
+
+## Technology Choice: HTML + Vanilla JS
+
+| Requirement | Approach | Why It Works |
+|-------------|----------|---------------|
+| Render device list | HTML table, 50 rows | Trivial for any browser |
+| Pagination | Server-side, JS updates table | Simple fetch + innerHTML |
+| Filters | Server-side query | No client-side filtering needed |
+| Real-time stats | Periodic fetch (5s) | Vanilla JS setInterval |
+| Bulk actions | POST to API | No complex state |
+
+**Browser never sees 1M devices.** It only sees:
+- 4-5 aggregate numbers
+- 50 device rows (one page)
+- Filter controls
+
+**Total DOM elements: ~200** (trivial for any browser)
+
+## When to Consider React/Vue
+
+| Scenario | Recommendation |
+|----------|----------------|
+| **Functional admin dashboard** | HTML + Vanilla JS (sufficient) |
+| **Real-time WebSocket updates** | Consider React (state management) |
+| **Complex nested filters** | Consider React (component reuse) |
+| **Customer-facing polished UI** | React with design system |
+
+**For OPO MVP:** Vanilla JS is sufficient. Backend engineer can build it.
+
+---
+
+# 9. Implementation Roadmap
 
 ## Phase 1: POC Enhancement (Current)
 - [x] Single server, single supervisor
