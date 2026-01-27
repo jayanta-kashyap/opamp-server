@@ -912,16 +912,6 @@ POST /api/bulk/toggle
 
 ---
 
-# Questions?
-
-## Contact
-
-- **POC Repository**: opamp-server, opamp-supervisor, opamp-device-agent
-- **Minikube Profile**: control-plane
-- **Namespaces**: opamp-control, opamp-edge
-
----
-
 # Appendix A: Protocol Details
 
 ## OpAMP (Server ↔ Supervisor)
