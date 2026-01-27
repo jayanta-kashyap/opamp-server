@@ -2,6 +2,25 @@
 
 ---
 
+## Table of Contents
+
+| Section | Description |
+|---------|-------------|
+| [1. Current POC Architecture](#1-current-poc-architecture) | Single-instance design in minikube |
+| [2. Production Challenges](#2-production-challenges) | Why POC won't scale |
+| [3. Proposed Production Architecture](#3-proposed-production-architecture) | High-level overview with Redis + Kafka |
+| [4. Component Deep Dive](#4-component-deep-dive) | Server, Supervisor, Redis, Kafka details |
+| [5. Data Flow Patterns](#5-data-flow-patterns) | Registration, commands, hot reload, DDS |
+| [6. Technology Choices](#6-technology-choices) | Redis + Kafka recommendation |
+| [7. Scaling Strategy](#7-scaling-strategy) | Capacity planning and sizing |
+| [8. Implementation Roadmap](#8-implementation-roadmap) | Phased rollout plan |
+
+**Quick Links:**
+- [4.1 OpAMP Server](#41-opamp-server-stateless-api-layer) | [4.2 Supervisor Fleet](#42-supervisor-fleet-connection-managers) | [4.3 Redis](#43-rediselasticache-state-storage) | [4.4 Kafka](#44-kafka-message-bus)
+- [5.1 Device Registration](#51-device-registration-flow) | [5.2 Command Flow](#52-command-flow-toggle-emission) | [5.3 Hot Reload](#53-hot-reload-flow-unchanged-from-poc) | [5.4 DDS Observability](#54-cloud-service-observability-serversupervisor--dds)
+
+---
+
 # Agenda
 
 1. Current POC Architecture
@@ -48,7 +67,7 @@
 
 | Aspect | Current State |
 |--------|---------------|
-| **Devices** | 22 devices |
+| **Devices** | 1 device |
 | **Server Pods** | 1 |
 | **Supervisor Pods** | 1 |
 | **State Storage** | In-memory |
@@ -94,58 +113,46 @@ How does Pod 1 know this? → Needs shared state
 ## High-Level Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Aruba Cloud (Kubernetes)                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │                     Control Plane Services                       │   │
-│   │                                                                  │   │
-│   │     ┌──────────────────────┐     ┌──────────────────────┐       │   │
-│   │     │    Redis/Elasticache │     │        Kafka         │       │   │
-│   │     │       (State)        │     │     (Messaging)      │       │   │
-│   │     │                      │     │                      │       │   │
-│   │     │  • device→supervisor │     │  • opamp.commands    │       │   │
-│   │     │  • device status     │     │  • opamp.events      │       │   │
-│   │     │  • config cache      │     │                      │       │   │
-│   │     │                      │     │                      │       │   │
-│   │     │  Sub-ms lookups      │     │  Durable delivery    │       │   │
-│   │     └──────────────────────┘     └──────────────────────┘       │   │
-│   │               │                            │                    │   │
-│   │               │                            │                    │   │
-│   │               ▼                            ▼                    │   │
-│   │     ┌────────────────────────────────────────────────────┐      │   │
-│   │     │                  OpAMP Servers                     │      │   │
-│   │     │                   (3-10 pods)                      │      │   │
-│   │     │                                                    │      │   │
-│   │     │  • REST API        • Redis lookup for routing      │      │   │
-│   │     │  • Dashboard       • Kafka produce for commands    │      │   │
-│   │     └────────────────────────────────────────────────────┘      │   │
-│   │         ▲                  │                   │                │   │
-│   │         │                  │                   │                │   │
-│   │         │           ┌──────▼───────────────────▼────────┐      │   │
-│   │         │           │                                    │      │   │
-│   │         └───────────│         Supervisor Fleet           │      │   │
-│   │                     │           (50+ pods)               │      │   │
-│   │                     │                                    │      │   │
-│   │                     │  ┌────┐ ┌────┐ ┌────┐     ┌────┐  │      │   │
-│   │                     │  │S-1 │ │S-2 │ │S-3 │ ... │S-50│  │      │   │
-│   │                     │  │20K │ │20K │ │20K │     │20K │  │      │   │
-│   │                     │  └────┘ └────┘ └────┘     └────┘  │      │   │
-│   │                     └──────────────┬─────────────────────┘      │   │
-│   └─────────────────────────────────────┼────────────────────────────┘   │
-│                                         │                               │
-│                                         │ gRPC (bidirectional stream)   │
-│                                         ▼                               │
-│   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │                    Edge / Campus / Devices                       │   │
-│   │                                                                  │   │
-│   │    ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐         ┌─────────────┐   │   │
-│   │    │ AP  │  │ AP  │  │ SW  │  │ GW  │  ...    │ 1M+ Devices │   │   │
-│   │    │     │  │     │  │     │  │     │         │             │   │   │
-│   │    └─────┘  └─────┘  └─────┘  └─────┘         └─────────────┘   │   │
-│   └─────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                Aruba Cloud (Kubernetes)                                  │
+├──────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────┐   ┌────────────────────┐  │
+│  │                  Control Plane Services                    │   │ DDS (CNX Common    │  │
+│  │                                                            │   │ Observability)     │  │
+│  │  ┌────────────────────┐    ┌────────────────────┐         │   │                    │  │
+│  │  │  Redis/Elasticache │    │       Kafka        │         │   │ ┌────────────────┐ │  │
+│  │  │      (State)       │    │    (Messaging)     │         │   │ │ Grafana Loki   │ │  │
+│  │  └─────────┬──────────┘    └─────────┬──────────┘         │   │ │   (Logs)       │ │  │
+│  │            │                         │                    │   │ └────────────────┘ │  │
+│  │            ▼                         ▼                    │   │ ┌────────────────┐ │  │
+│  │  ┌────────────────────────────────────────────────────┐   │   │ │ Grafana Mimir  │ │  │
+│  │  │              OpAMP Servers (n pods)             │───┼───┼►│  (Metrics)     │ │  │
+│  │  │                                                    │   │   │ └────────────────┘ │  │
+│  │  │  • REST API    • Dashboard    • OTel SDK           │   │   │ ┌────────────────┐ │  │
+│  │  └────────────────────────┬───────────────────────────┘   │   │ │ Grafana Tempo  │ │  │
+│  │                           │                               │   │ │  (Traces)      │ │  │
+│  │                           ▼                               │   │ └────────────────┘ │  │
+│  │  ┌────────────────────────────────────────────────────┐   │   │                    │  │
+│  │  │            Supervisor Fleet (m pods)             │───┼───┼►   (OTLP export)   │  │
+│  │  │                                                    │   │   │                    │  │
+│  │  │  ┌────┐ ┌────┐ ┌────┐ ┌────┐    • OTel SDK        │   │   └────────────────────┘  │
+│  │  │  │S-1 │ │S-2 │ │S-3 │ │S-50│   (20K devices each) │   │                           │
+│  │  │  └────┘ └────┘ └────┘ └────┘                       │   │                           │
+│  │  └────────────────────────┬───────────────────────────┘   │                           │
+│  │                           │                               │                           │
+│  └───────────────────────────┼───────────────────────────────┘                           │
+│                              │                                                           │
+│                              │ gRPC (bidirectional stream)                               │
+│                              ▼                                                           │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                          Edge / Campus / Devices                                   │   │
+│  │                                                                                    │   │
+│  │    ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐              ┌─────────────┐             │   │
+│  │    │ AP  │   │ AP  │   │ SW  │   │ GW  │    ...       │ 1M+ Devices │             │   │
+│  │    └─────┘   └─────┘   └─────┘   └─────┘              └─────────────┘             │   │
+│  └───────────────────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -304,7 +311,7 @@ Recommended: cache.r6g.large (13 GB) for headroom and replication.
 | `opamp.config-updates` | Broadcast config changes | - | All supervisors |
 
 **Why Kafka:**
-- ✅ Already available in Aruba
+- ✅ Already available in CNX
 - ✅ Durable (commands not lost)
 - ✅ Ordered delivery per partition
 - ✅ Replay capability for recovery
@@ -412,6 +419,157 @@ Device Agent                     FluentBit Container
 
 ---
 
+## 5.4 Cloud Service Observability (Server/Supervisor → DDS)
+
+**Note:** This section describes observability for the OpAMP cloud services themselves (Server and Supervisor). This is separate from the edge device telemetry pipeline described in Section 5.3.
+
+DDS is the **CNX observability platform**. The OpAMP cloud services (Server and Supervisor Go applications) are instrumented with OpenTelemetry SDK to send their telemetry to DDS, just like other CNX services.
+
+### Key Design Principles
+
+1. **No STDOUT/STDERR Logging** - Server and Supervisor code will NOT write logs to stdout/stderr. This ensures we do not accidentally send logs to Humio (which captures container stdout in CNX). All logging is done via OTel SDK exporters directly to DDS.
+
+2. **OTel Exporters Only** - All three telemetry types (logs, metrics, traces) are sent exclusively via OTel OTLP exporters to DDS backends.
+
+3. **Correlated Telemetry** - All three data types share trace context (trace_id, span_id), enabling seamless navigation in Grafana:
+   - Jump from a log entry → related trace
+   - Jump from a trace span → related logs
+   - Jump from metrics → exemplars → traces
+   - Full request lifecycle visibility across services
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         OpAMP Cloud Services                                │
+│                                                                             │
+│   ┌─────────────────────┐         ┌─────────────────────┐                  │
+│   │    OpAMP Server     │         │     Supervisor      │                  │
+│   │     (3-10 pods)     │         │     (50+ pods)      │                  │
+│   │                     │         │                     │                  │
+│   │  ┌───────────────┐  │         │  ┌───────────────┐  │                  │
+│   │  │ OTel SDK      │  │         │  │ OTel SDK      │  │                  │
+│   │  │ - Traces      │──┼─────────┼──│ - Traces      │  │                  │
+│   │  │ - Metrics     │  │ shared  │  │ - Metrics     │  │                  │
+│   │  │ - Logs        │  │ context │  │ - Logs        │  │                  │
+│   │  └───────┬───────┘  │         │  └───────┬───────┘  │                  │
+│   │          │          │         │          │          │                  │
+│   │  ❌ No STDOUT       │         │  ❌ No STDOUT       │                  │
+│   └──────────┼──────────┘         └──────────┼──────────┘                  │
+│              │                               │                              │
+│              └───────────────┬───────────────┘                              │
+│                              │                                              │
+│                              ▼  OTLP (gRPC/HTTP)                            │
+│              ┌───────────────────────────────┐                              │
+│              │      OTel Collector           │  (optional, or direct)       │
+│              │      (sidecar or central)     │                              │
+│              └───────────────┬───────────────┘                              │
+│                              │                                              │
+└──────────────────────────────┼──────────────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                  DDS (CNX Common Observability Platform)                     │
+│                                                                              │
+│    ┌────────────────┐    ┌────────────────┐    ┌────────────────┐           │
+│    │  Grafana Loki  │◄───│───── trace_id ─────►│ Grafana Tempo  │           │
+│    │    (Logs)      │    │                │    │   (Traces)     │           │
+│    └───────▲────────┘    │   Correlated   │    └───────▲────────┘           │
+│            │             │   via OTel     │            │                    │
+│            └─────────────┤   Context      ├────────────┘                    │
+│                          │                │                                  │
+│                    ┌─────▼────────┐       │                                  │
+│                    │Grafana Mimir │───────┘                                  │
+│                    │  (Metrics)   │  exemplars → traces                      │
+│                    └──────────────┘                                          │
+│                                                                              │
+│                        ┌────────────────────┐                                │
+│                        │      Grafana       │                                │
+│                        │   (Dashboards)     │                                │
+│                        │  Logs ↔ Traces ↔   │                                │
+│                        │      Metrics       │                                │
+│                        └────────────────────┘                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Gets Instrumented
+
+| Service | Telemetry Type | What It Captures |
+|---------|----------------|------------------|
+| **OpAMP Server** | Traces | API request latency, Redis/Kafka calls |
+| **OpAMP Server** | Metrics | Request count, error rate, queue depth |
+| **OpAMP Server** | Logs | Structured logs (JSON) |
+| **Supervisor** | Traces | Device connection lifecycle, config push latency |
+| **Supervisor** | Metrics | Connected devices, commands processed, errors |
+| **Supervisor** | Logs | Device events, config changes |
+
+### Go OTel Instrumentation Example
+
+```go
+import (
+    "context"
+    
+    "go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/attribute"
+    "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+    "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+    "go.opentelemetry.io/otel/log"
+    "go.opentelemetry.io/otel/sdk/trace"
+    sdklog "go.opentelemetry.io/otel/sdk/log"
+)
+
+var logger log.Logger
+
+func initTelemetry(ctx context.Context) {
+    // Trace exporter → Tempo
+    traceExp, _ := otlptracegrpc.New(ctx,
+        otlptracegrpc.WithEndpoint("tempo.dds.aruba.cloud:4317"),
+    )
+    tp := trace.NewTracerProvider(trace.WithBatcher(traceExp))
+    otel.SetTracerProvider(tp)
+    
+    // Log exporter → Loki (via OTel Collector)
+    // NO STDOUT - logs go directly to DDS
+    logExp, _ := otlploggrpc.New(ctx,
+        otlploggrpc.WithEndpoint("loki.dds.aruba.cloud:4317"),
+    )
+    lp := sdklog.NewLoggerProvider(sdklog.WithProcessor(
+        sdklog.NewBatchProcessor(logExp),
+    ))
+    logger = lp.Logger("opamp-server")
+}
+
+// Usage in handler - trace context automatically correlates logs
+func HandleToggle(ctx context.Context, deviceID string) {
+    ctx, span := otel.Tracer("opamp-server").Start(ctx, "HandleToggle")
+    defer span.End()
+    
+    span.SetAttributes(attribute.String("device.id", deviceID))
+    
+    // ❌ NEVER: fmt.Println() or log.Printf() - goes to stdout/Humio
+    // ✅ ALWAYS: OTel logger - goes to DDS with trace correlation
+    logger.Emit(ctx, log.Record{
+        Severity: log.SeverityInfo,
+        Body:     log.StringValue("Processing toggle command"),
+        Attributes: []log.KeyValue{
+            log.String("device.id", deviceID),
+        },
+    })
+    
+    // ... business logic
+}
+```
+
+### Key Metrics to Expose
+
+| Metric | Type | Labels |
+|--------|------|--------|
+| `opamp_commands_total` | Counter | action, status |
+| `opamp_config_push_duration_seconds` | Histogram | device_type |
+| `opamp_connected_devices` | Gauge | supervisor_pod |
+| `opamp_redis_latency_seconds` | Histogram | operation |
+| `opamp_kafka_messages_total` | Counter | topic, status |
+
+---
+
 # 6. Technology Choices
 
 ## Recommendation: Redis + Kafka
@@ -479,6 +637,15 @@ SET config:fluentbit:v1.2.3 "<config data>"
 |-----------|--------|
 | **Redis/Elasticache** | Device→Supervisor routing, status cache, config templates |
 | **Kafka** | Command delivery, durability, audit trail |
+| **DDS** | Observability platform for cloud services (Server, Supervisor) telemetry |
+
+### DDS Integration (Cloud Services Observability)
+
+| DDS Component | Signal | Source | Use Case |
+|---------------|--------|--------|----------|
+| **Grafana Loki** | Logs | Server + Supervisor pods | Structured logs, error tracking |
+| **Grafana Mimir** | Metrics | Server + Supervisor pods | Request rates, latency, device counts |
+| **Grafana Tempo** | Traces | Server + Supervisor pods | Request tracing, end-to-end latency |
 
 > **Note:** Other Aruba databases (CockroachDB, ArangoDB, ClickHouse) are not needed for OpAMP core functionality. They can be added later if analytics or audit log queries are required.
 
@@ -490,6 +657,7 @@ SET config:fluentbit:v1.2.3 "<config data>"
 ├─────────────────────────────────────────┤
 │  ✅ Redis/Elasticache (state + routing) │
 │  ✅ Kafka (command delivery)            │
+│  ✅ DDS (Loki, Mimir, Tempo)            │
 │  ✅ Kubernetes                          │
 │  ✅ Load balancers                      │
 └─────────────────────────────────────────┘
@@ -505,8 +673,8 @@ SET config:fluentbit:v1.2.3 "<config data>"
 ┌─────────────────────────────────────────┐
 │          New Components                  │
 ├─────────────────────────────────────────┤
-│  🆕 OpAMP Server pods                   │
-│  🆕 Supervisor pods                     │
+│  🆕 OpAMP Server pods (OTel instrumented)|
+│  🆕 Supervisor pods (OTel instrumented) │
 │  🆕 Device agents (on each device)      │
 └─────────────────────────────────────────┘
 ```
@@ -569,15 +737,17 @@ For 1M devices:
 
 ## Phase 1: POC Enhancement (Current)
 - [x] Single server, single supervisor
-- [x] 22 devices working
+- [x] 1 device working
 - [x] Hot reload with FluentBit API
 - [x] Dashboard with toggle controls
 
 ## Phase 2: Add Shared State (2-3 weeks)
-- [ ] Add Redis/Elasticache to cluster
+- [x] Redis/Elasticache *(already available in CNX cluster)*
+- [x] Kafka *(already available in CNX cluster)*
 - [ ] Migrate device registry to Redis
 - [ ] Add Kafka producer to Server
 - [ ] Add Kafka consumer to Supervisor
+- [ ] Add OTel instrumentation (no stdout, export to DDS)
 
 ## Phase 3: Multi-Pod Deployment (2-3 weeks)
 - [ ] Scale Server to 3 replicas
@@ -588,7 +758,7 @@ For 1M devices:
 ## Phase 4: Production Hardening (4-6 weeks)
 - [ ] Add authentication/authorization
 - [ ] Implement rate limiting
-- [ ] Add comprehensive monitoring
+- [ ] Add comprehensive monitoring (DDS dashboards)
 - [ ] Runbook and documentation
 - [ ] Security audit
 
@@ -610,7 +780,8 @@ For 1M devices:
 | **Durability** | Redis for state, Kafka for commands |
 | **Low Latency** | gRPC streaming, Redis lookups (0.5ms) |
 | **Auditability** | All commands logged to Kafka (retention) |
-| **Operational Simplicity** | Uses existing Redis + Kafka infrastructure |
+| **Observability** | Cloud services (Server/Supervisor) instrumented with OTel → DDS |
+| **Operational Simplicity** | Uses existing Redis + Kafka + DDS infrastructure |
 
 ## Key Metrics to Monitor
 
